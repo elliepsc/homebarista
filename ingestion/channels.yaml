@@ -1,0 +1,39 @@
+channels:
+  - id: UCMb0O2CdPBNi-QqPk5T3gsQ
+    name: James Hoffmann
+    tags: [espresso, filter, grind, origin, equipment, technique]
+    priority: critical
+    max_videos: 80
+
+  - id: UCbS5dZ7rVAGBWMQGbMBZCcg
+    name: Barista Hustle
+    tags: [extraction, sca, professional, technique, science]
+    priority: critical
+    max_videos: 50
+
+  - id: UCVuB_6YFD7-lrHoqnHCg2Lg
+    name: Lance Hedrick
+    tags: [espresso, dialing_in, equipment, super_automatic, grind]
+    priority: high
+    max_videos: 40
+
+  - id: UCn3jcZBFRhAHAC4Xr9sTkQQ
+    name: European Coffee Trip
+    tags: [origin, roasting, specialty, method]
+    priority: medium
+    max_videos: 30
+
+  - id: UCo4VPxVEiPSDljgcXIe5RJA
+    name: Tim Wendelboe
+    tags: [filter, origin, technique, professional]
+    priority: medium
+    max_videos: 20
+
+playlists:
+  - id: PLynbSsRRLfnoR4CZrRlhvkbY1xPQ5e7Py
+    name: "James Hoffmann - How to make better coffee"
+    tags: [beginner, technique, troubleshooting]
+
+  - id: PLynbSsRRLfnoV1HiYeF0n3CwDo2gm59Gx
+    name: "James Hoffmann - Espresso Machines"
+    tags: [espresso, machine, equipment, super_automatic]
