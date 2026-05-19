@@ -29,9 +29,9 @@ from pathlib import Path
 
 import yaml
 
-from homebarista.transcript_preprocessor import TranscriptPreprocessor
-from homebarista.embedder import Embedder
-from homebarista.vector_store import VectorStore
+from ingestion.transcript_preprocessor import TranscriptPreprocessor
+from ingestion.embedder import Embedder
+from pipeline.vector_store import VectorStore
 
 
 # ------------------------------------------------------------------
@@ -109,9 +109,9 @@ def fetch_real_documents(
 
     Documents have: source_id, title, channel, url, tags, transcript_text.
     """
-    from homebarista.youtube_client import YouTubeClient
-    from homebarista.transcript_fetcher import TranscriptFetcher
-    from homebarista.content_classifier import ContentClassifier
+    from ingestion.youtube_client import YouTubeClient
+    from ingestion.transcript_fetcher import TranscriptFetcher
+    from ingestion.content_classifier import ContentClassifier
 
     yt_client = YouTubeClient()
     transcript_fetcher = TranscriptFetcher()
@@ -380,7 +380,7 @@ def run_ingestion(
     if not dry_run and not demo_mode:
         print(
             "\nNEXT STEP: Export snapshot for Streamlit Cloud deployment:\n"
-            "  python -m homebarista.vector_store --export"
+            "  python -m pipeline.vector_store --export"
         )
 
     return report
