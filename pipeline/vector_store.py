@@ -16,7 +16,7 @@ The snapshot is a single SQLite file (data/chroma_snapshot.db) exported
 from ChromaDB's underlying DuckDB/SQLite engine.
 
 HOW IT WORKS:
-- After ingestion locally: run `python -m homebarista.vector_store --export`
+- After ingestion locally: run `python -m pipeline.vector_store --export`
   → writes data/chroma_snapshot.db (typically 20-80 MB for 300+ docs)
 - Commit data/chroma_snapshot.db to git (remove from .gitignore)
 - On Streamlit Cloud startup: vector_store detects missing chroma_db/,
@@ -118,7 +118,7 @@ class VectorStore:
         else:
             raise FileNotFoundError(
                 f"Snapshot not found at {self.snapshot_path}. "
-                "Run: python -m homebarista.vector_store --export"
+                "Run: python -m pipeline.vector_store --export"
             )
 
     def export_snapshot(self) -> None:
@@ -126,7 +126,7 @@ class VectorStore:
         Export the current ChromaDB to a snapshot directory for git commit.
         Run this after ingestion to prepare for Streamlit Cloud deployment.
 
-        Usage: python -m homebarista.vector_store --export
+        Usage: python -m pipeline.vector_store --export
         """
         if not self.persist_dir.exists():
             raise RuntimeError("No local ChromaDB to export. Run ingestion first.")
@@ -288,6 +288,6 @@ if __name__ == "__main__":
         stats = store.get_stats()
         print(json.dumps(stats, indent=2))
     else:
-        print("Usage: python -m homebarista.vector_store [--export | --stats]")
+        print("Usage: python -m pipeline.vector_store [--export | --stats]")
         print("  --export: snapshot current ChromaDB for Streamlit Cloud deployment")
         print("  --stats:  print collection statistics")

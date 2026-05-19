@@ -13,7 +13,7 @@ Two modes:
    Same components, fixed order.
 
 Usage from Streamlit or CLI:
-    from homebarista.pipeline import run_pipeline
+    from pipeline.pipeline import run_pipeline
     result = await run_pipeline("my DeLonghi makes bitter espresso")
 """
 
@@ -27,14 +27,14 @@ from typing import Literal, Optional
 
 import anthropic
 
-from homebarista.models import BrewingContext, CoachingSession
-from homebarista.symptom_extractor import SymptomExtractor
-from homebarista.diagnostic_planner import DiagnosticPlanner
-from homebarista.embedder import Embedder
-from homebarista.vector_store import VectorStore
-from homebarista.retriever import Retriever
-from homebarista.coaching_evaluator import CoachingEvaluator
-from homebarista.agent import HomeBaristaAgent
+from engine.models import BrewingContext, CoachingSession
+from engine.symptom_extractor import SymptomExtractor
+from engine.diagnostic_planner import DiagnosticPlanner
+from ingestion.embedder import Embedder
+from pipeline.vector_store import VectorStore
+from pipeline.retriever import Retriever
+from engine.coaching_evaluator import CoachingEvaluator
+from orchestration.agent import HomeBaristaAgent
 
 
 # ------------------------------------------------------------------
@@ -45,7 +45,7 @@ LOG_DIR  = Path("logs")
 LOG_FILE = LOG_DIR / "sessions.jsonl"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
-logger = logging.getLogger("homebarista")
+logger = logging.getLogger("pipeline")
 
 
 # ------------------------------------------------------------------

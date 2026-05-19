@@ -16,9 +16,9 @@ Fixes vs. original plan:
 
 from typing import Optional
 
-from homebarista.models import BrewingContext, DiagnosticResult
-from homebarista.embedder import Embedder
-from homebarista.vector_store import VectorStore
+from engine.models import BrewingContext, DiagnosticResult
+from ingestion.embedder import Embedder
+from pipeline.vector_store import VectorStore
 
 
 # ------------------------------------------------------------------
@@ -221,7 +221,7 @@ class Retriever:
 # Smoke test
 # ------------------------------------------------------------------
 if __name__ == "__main__":
-    from homebarista.models import BrewingContext, DiagnosticResult, RootCause, Intervention
+    from engine.models import BrewingContext, DiagnosticResult, RootCause, Intervention
 
     # Minimal stubs for testing without full pipeline
     embedder = Embedder()

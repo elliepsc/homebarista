@@ -21,8 +21,8 @@ Fixes vs. original plan:
 import re
 from typing import Optional
 
-from homebarista.models import BrewingContext, DiagnosticResult
-from homebarista.diagnostic_planner import MACHINE_ADJUSTABLE, PARAM_TO_CAPABILITY
+from engine.models import BrewingContext, DiagnosticResult
+from engine.diagnostic_planner import MACHINE_ADJUSTABLE, PARAM_TO_CAPABILITY
 
 
 # ------------------------------------------------------------------
@@ -310,7 +310,7 @@ class CoachingEvaluator:
 # Smoke test
 # ------------------------------------------------------------------
 if __name__ == "__main__":
-    from homebarista.models import BrewingContext, DiagnosticResult, RootCause, Intervention
+    from engine.models import BrewingContext, DiagnosticResult, RootCause, Intervention
 
     evaluator = CoachingEvaluator()
 

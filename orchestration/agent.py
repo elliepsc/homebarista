@@ -37,11 +37,11 @@ from typing import Optional
 from dataclasses import asdict
 import anthropic
 
-from homebarista.models import BrewingContext, DiagnosticResult, CoachingSession
-from homebarista.symptom_extractor import SymptomExtractor
-from homebarista.diagnostic_planner import DiagnosticPlanner
-from homebarista.retriever import Retriever
-from homebarista.coaching_evaluator import CoachingEvaluator
+from engine.models import BrewingContext, DiagnosticResult, CoachingSession
+from engine.symptom_extractor import SymptomExtractor
+from engine.diagnostic_planner import DiagnosticPlanner
+from pipeline.retriever import Retriever
+from engine.coaching_evaluator import CoachingEvaluator
 
 
 # ------------------------------------------------------------------

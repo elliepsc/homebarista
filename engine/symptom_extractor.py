@@ -16,7 +16,7 @@ import json
 from typing import Optional
 import anthropic
 
-from homebarista.models import BrewingContext
+from engine.models import BrewingContext
 
 
 # ------------------------------------------------------------------

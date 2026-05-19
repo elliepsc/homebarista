@@ -24,7 +24,7 @@ Present them as such in the README and in interviews.
 from dataclasses import field
 from typing import Optional
 
-from homebarista.models import (
+from engine.models import (
     BrewingContext,
     DiagnosticResult,
     Intervention,
@@ -725,7 +725,7 @@ class DiagnosticPlanner:
 # Smoke test
 # ------------------------------------------------------------------
 if __name__ == "__main__":
-    from homebarista.models import BrewingContext
+    from engine.models import BrewingContext
 
     planner = DiagnosticPlanner()
 

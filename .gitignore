@@ -13,4 +13,7 @@ env/
 
 *.log
 
+data/chroma_db/
+logs/
+
 docs-notes/
