@@ -1,0 +1,37 @@
+{
+  "run_at": "2026-05-18T21:11:07.483475+00:00",
+  "duration_seconds": 8.6,
+  "mode": "demo",
+  "channel_filter": null,
+  "videos_fetched": 40,
+  "videos_skipped_non_informative": 0,
+  "total_chunks_generated": 40,
+  "total_chunks_indexed": 40,
+  "domain_distribution": {
+    "troubleshoot": 12,
+    "technique": 7,
+    "grind": 7,
+    "machine": 8,
+    "method": 3,
+    "origin": 3
+  },
+  "method_distribution": {
+    "espresso": 13,
+    "general": 7,
+    "v60": 4,
+    "super_automatic": 8,
+    "moka": 6,
+    "aeropress": 2
+  },
+  "chunks_per_channel": {
+    "James Hoffmann": 14,
+    "Barista Hustle": 7,
+    "Lance Hedrick": 11,
+    "Tim Wendelboe": 4,
+    "European Coffee Trip": 4
+  },
+  "quota_used": 0,
+  "embedding_model": "all-MiniLM-L6-v2",
+  "chunk_size_tokens": 400,
+  "overlap_tokens": 80
+}
