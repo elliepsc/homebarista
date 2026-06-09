@@ -1,19 +1,47 @@
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
 
-.env
+# Virtual environments
 .venv/
 venv/
 env/
 
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Test, lint, type-check and coverage caches
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Runtime outputs and local databases
 *.log
-
-data/chroma_db/
 logs/
+data/chroma_db/
 
+# Local notes and scratch docs
 docs-notes/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDE and OS local files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
