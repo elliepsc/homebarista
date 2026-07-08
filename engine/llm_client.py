@@ -32,7 +32,9 @@ package, base_url switch); Anthropic uses the `anthropic` package.
 
 import json
 import os
+import random
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -55,6 +57,42 @@ KEY_ENV_VARS = {
 }
 
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+# Free-tier providers (Groq default) rate-limit on tokens/minute, not just
+# requests/minute — a single generation call can burn a large chunk of that
+# budget. Retry 429s with backoff instead of failing the whole eval/pipeline run.
+RATE_LIMIT_MAX_RETRIES = 5
+RATE_LIMIT_BASE_DELAY = 1.0
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    """Duck-typed on purpose — avoids importing openai/anthropic just to catch their errors."""
+    if type(exc).__name__ == "RateLimitError":
+        return True
+    return getattr(exc, "status_code", None) == 429
+
+
+def _rate_limit_delay(exc: Exception, attempt: int) -> float:
+    """Honor the API's Retry-After header when present, else exponential backoff + jitter."""
+    headers = getattr(getattr(exc, "response", None), "headers", None)
+    retry_after = headers.get("retry-after") if headers else None
+    if retry_after:
+        try:
+            return float(retry_after)
+        except ValueError:
+            pass
+    return RATE_LIMIT_BASE_DELAY * (2**attempt) + random.uniform(0, 0.5)
+
+
+def _with_rate_limit_retry(call):
+    """Run `call()`, retrying on 429s with backoff. Re-raises other errors immediately."""
+    for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
+        try:
+            return call()
+        except Exception as exc:
+            if not _is_rate_limit_error(exc) or attempt == RATE_LIMIT_MAX_RETRIES:
+                raise
+            time.sleep(_rate_limit_delay(exc, attempt))
 
 
 def get_provider() -> str:
@@ -235,12 +273,12 @@ class LLMClient:
                 for t in tools
             ]
 
-        completion = self._openai_client().chat.completions.create(
+        completion = _with_rate_limit_retry(lambda: self._openai_client().chat.completions.create(
             model=self.model,
             max_tokens=max_tokens,
             messages=oa_messages,
             **kwargs,
-        )
+        ))
         choice = completion.choices[0]
         tool_calls = []
         for tc in (choice.message.tool_calls or []):
@@ -308,12 +346,12 @@ class LLMClient:
         if tools:
             kwargs["tools"] = tools
 
-        response = self._anthropic_client().messages.create(
+        response = _with_rate_limit_retry(lambda: self._anthropic_client().messages.create(
             model=self.model,
             max_tokens=max_tokens,
             messages=an_messages,
             **kwargs,
-        )
+        ))
         text = strip_reasoning(
             "".join(b.text for b in response.content if b.type == "text")
         )

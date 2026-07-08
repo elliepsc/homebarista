@@ -87,6 +87,80 @@ def test_strip_reasoning_removes_think_blocks():
     assert strip_reasoning("plain answer") == "plain answer"
 
 
+# ------------------------------------------------------------------
+# Rate-limit retry (Groq free tier: 429s must be retried, not fatal)
+# ------------------------------------------------------------------
+
+class FakeRateLimitError(Exception):
+    """Stands in for openai.RateLimitError / anthropic.RateLimitError (duck-typed by name)."""
+    __name__ = "RateLimitError"
+
+
+FakeRateLimitError.__name__ = "RateLimitError"
+
+
+def test_retries_on_rate_limit_then_succeeds(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    sleeps = []
+    monkeypatch.setattr("engine.llm_client.time.sleep", lambda s: sleeps.append(s))
+
+    client = LLMClient(api_key="k")
+    fake = FakeOpenAI(SimpleNamespace(content="ok", tool_calls=None))
+    calls = {"n": 0}
+    real_create = fake._create
+
+    def flaky_create(**kwargs):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise FakeRateLimitError("429")
+        return real_create(**kwargs)
+
+    fake._create = flaky_create
+    fake.chat.completions.create = flaky_create
+    client._sdk_client = fake
+
+    response = client.create([{"role": "user", "content": "hi"}])
+    assert response.text == "ok"
+    assert calls["n"] == 3
+    assert len(sleeps) == 2  # retried twice before succeeding
+
+
+def test_gives_up_after_max_retries(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.setattr("engine.llm_client.time.sleep", lambda s: None)
+
+    client = LLMClient(api_key="k")
+    fake = FakeOpenAI(SimpleNamespace(content="ok", tool_calls=None))
+
+    def always_rate_limited(**kwargs):
+        raise FakeRateLimitError("429")
+
+    fake.chat.completions.create = always_rate_limited
+    client._sdk_client = fake
+
+    with pytest.raises(FakeRateLimitError):
+        client.create([{"role": "user", "content": "hi"}])
+
+
+def test_non_rate_limit_error_is_not_retried(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    sleeps = []
+    monkeypatch.setattr("engine.llm_client.time.sleep", lambda s: sleeps.append(s))
+
+    client = LLMClient(api_key="k")
+    fake = FakeOpenAI(SimpleNamespace(content="ok", tool_calls=None))
+
+    def broken_create(**kwargs):
+        raise ValueError("not a rate limit")
+
+    fake.chat.completions.create = broken_create
+    client._sdk_client = fake
+
+    with pytest.raises(ValueError):
+        client.create([{"role": "user", "content": "hi"}])
+    assert sleeps == []
+
+
 def test_openai_response_strips_reasoning(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     client = LLMClient(api_key="k")
