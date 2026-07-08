@@ -31,7 +31,8 @@ dist/
 
 # Runtime outputs and local databases
 *.log
-logs/
+logs/*
+!logs/*.sample.jsonl
 data/chroma_db/
 
 # Local notes and scratch docs
