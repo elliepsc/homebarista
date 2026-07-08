@@ -1,0 +1,28 @@
+# Secrets — NEVER baked into image layers (compose injects .env at runtime)
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# VCS / CI
+.git
+.github
+
+# Python litter
+__pycache__
+*.py[cod]
+.venv
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Local runtime state (mounted as volumes by docker-compose)
+logs
+data/chroma_db
+
+# Dev-only
+tests
+evals/results
+docs-notes
+.vscode
+.idea
