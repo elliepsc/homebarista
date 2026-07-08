@@ -7,7 +7,10 @@ Multi-turn chat over the coaching pipeline.
 - LIVE mode: locked behind a password (st.secrets["LIVE_PASSWORD"]) OR a
   user-provided API key for the configured LLM provider (kept in this
   user's session state only — never written to os.environ, never stored,
-  never logged). Budget: max 10 live runs per session, then back to demo.
+  never logged). Budget: BYO key is unlimited (visitor's own cost); the
+  shared password is capped per session AND by a global daily budget
+  shared across all visitors (module-level counter — resets on process
+  restart, e.g. Streamlit Cloud sleep/redeploy).
 - LLM provider/model come from .env (Groq by default — see .env.example
   and engine/llm_client.py).
 - Off-topic input is refused by the deterministic ScopeGuard before any
@@ -36,8 +39,48 @@ from pipeline.pipeline import run_pipeline
 # live eval run: see evals/run_rag_eval.py).
 WINNER_STYLE = "detailed"
 STYLES = ["detailed", "concise", "technical"]
-MAX_LIVE_RUNS = 10
 FEEDBACK_FILE = Path("logs/feedback.jsonl")
+
+# Live-mode budgets. Two unlock paths, two different cost owners:
+# - BYO key (visitor's own): their cost, not capped here.
+# - Shared password (owner's key): capped per session AND by a global
+#   daily budget shared across every visitor, so a session reset (new
+#   tab, cleared cookies) can't be used to bypass the per-session cap.
+# The global counter MUST live behind st.cache_resource, not a plain
+# module-level variable: Streamlit re-executes the whole main script on
+# every rerun, so a bare global gets reset every single time (verified
+# empirically) — it would never actually accumulate. cache_resource is
+# the one construct that survives reruns AND is shared across every
+# session for the life of the process. It resets on process restart
+# (Cloud sleep/redeploy) — an acceptable soft limit for a portfolio
+# project, not a hard guarantee.
+MAX_LIVE_RUNS_PER_SESSION = 10
+MAX_LIVE_RUNS_GLOBAL_DAILY = 25
+
+
+@st.cache_resource
+def _shared_key_budget_store() -> dict:
+    return {"date": None, "count": 0}
+
+
+def _todays_shared_key_budget() -> dict:
+    """The cache_resource-backed budget dict, rolled over for the current
+    UTC day. Both read and write go through this so the rollover happens
+    consistently regardless of call order."""
+    budget = _shared_key_budget_store()
+    today = datetime.now(timezone.utc).date().isoformat()
+    if budget["date"] != today:
+        budget["date"] = today
+        budget["count"] = 0
+    return budget
+
+
+def _shared_key_runs_remaining_today() -> int:
+    return MAX_LIVE_RUNS_GLOBAL_DAILY - _todays_shared_key_budget()["count"]
+
+
+def _consume_shared_key_run() -> None:
+    _todays_shared_key_budget()["count"] += 1
 
 EXAMPLE_PROBLEMS = [
     "My DeLonghi Dinamica makes bitter espresso every morning",
@@ -114,10 +157,19 @@ with st.sidebar:
                     st.session_state["live_unlocked"] = True
                     st.success("Live mode unlocked with your key.")
         if st.session_state["live_unlocked"]:
-            remaining = MAX_LIVE_RUNS - st.session_state["live_runs"]
-            st.caption(f"Live budget: {max(remaining, 0)}/{MAX_LIVE_RUNS} runs left this session.")
-            if remaining <= 0:
-                st.warning("Live budget exhausted — falling back to demo mode.")
+            if st.session_state["byo_api_key"]:
+                st.caption("Live budget: unlimited — you're using your own API key.")
+            else:
+                session_remaining = MAX_LIVE_RUNS_PER_SESSION - st.session_state["live_runs"]
+                global_remaining = _shared_key_runs_remaining_today()
+                remaining = min(session_remaining, global_remaining)
+                st.caption(
+                    f"Live budget: {max(remaining, 0)} runs left "
+                    f"(session cap {MAX_LIVE_RUNS_PER_SESSION}, "
+                    f"shared daily cap {MAX_LIVE_RUNS_GLOBAL_DAILY})."
+                )
+                if remaining <= 0:
+                    st.warning("Live budget exhausted — falling back to demo mode.")
 
     st.divider()
     st.subheader("Try an example")
@@ -155,10 +207,15 @@ if not user_input:
     user_input = st.session_state.pop("pending_input", None)
 
 if user_input:
+    using_byo_key = bool(st.session_state["byo_api_key"])
+    shared_key_budget_left = using_byo_key or (
+        st.session_state["live_runs"] < MAX_LIVE_RUNS_PER_SESSION
+        and _shared_key_runs_remaining_today() > 0
+    )
     demo = (
         mode.startswith("Demo")
         or not st.session_state["live_unlocked"]
-        or st.session_state["live_runs"] >= MAX_LIVE_RUNS
+        or not shared_key_budget_left
     )
 
     with st.chat_message("user"):
@@ -177,6 +234,8 @@ if user_input:
 
     if not demo:
         st.session_state["live_runs"] += 1
+        if not using_byo_key:
+            _consume_shared_key_run()
 
     status = result["status"]
     if status == "coaching":
