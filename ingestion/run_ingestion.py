@@ -391,6 +391,10 @@ def run_ingestion(
 # ------------------------------------------------------------------
 
 def main():
+    # Entry point only — YOUTUBE_API_KEY, DEMO_MODE, LLM_* (see .env.example)
+    from dotenv import load_dotenv
+    load_dotenv()
+
     parser = argparse.ArgumentParser(
         description="HomeBarista ingestion pipeline — YouTube → ChromaDB"
     )

@@ -2,7 +2,8 @@
 HomeBarista Agent — True Agentic Loop
 ======================================
 This replaces the linear pipeline (pipeline.py) with a genuine agentic
-architecture using Claude's tool_use capability.
+architecture using LLM tool-calling (provider set in .env — Groq by
+default, Anthropic/OpenAI switchable; see engine/llm_client.py).
 
 WHY THIS IS DIFFERENT FROM A PIPELINE:
 A pipeline executes steps in a fixed order, unconditionally.
@@ -25,9 +26,9 @@ TOOL DEFINITIONS:
 - validate_coaching     : check coaching quality (deterministic checks)
 
 AGENT LOOP:
-Claude receives the user message + tool definitions.
+The LLM receives the user message + tool definitions.
 It decides what to call. The loop runs until:
-- stop_reason == "end_turn"  (Claude decided it's done)
+- stop_reason == "end_turn"  (the model decided it's done)
 - max_iterations reached      (safety cap)
 - "ask_clarification" is called (halts, waits for user response)
 """
@@ -35,8 +36,8 @@ It decides what to call. The loop runs until:
 import json
 from typing import Optional
 from dataclasses import asdict
-import anthropic
 
+from engine.llm_client import LLMClient
 from engine.models import BrewingContext, DiagnosticResult, CoachingSession
 from engine.symptom_extractor import SymptomExtractor
 from engine.diagnostic_planner import DiagnosticPlanner
@@ -45,7 +46,8 @@ from engine.coaching_evaluator import CoachingEvaluator
 
 
 # ------------------------------------------------------------------
-# Tool definitions (passed to Claude API)
+# Tool definitions (Anthropic-style schema; LLMClient converts to the
+# OpenAI function format for Groq/OpenAI)
 # ------------------------------------------------------------------
 
 TOOLS = [
@@ -222,7 +224,7 @@ TOOLS = [
 
 class HomeBaristaAgent:
     """
-    Agentic coaching loop using Claude tool_use.
+    Agentic coaching loop using LLM tool-calling (any provider via LLMClient).
     The LLM decides which tools to call and when to stop.
     """
 
@@ -275,16 +277,16 @@ IMPORTANT RULES:
         diagnostic_planner: DiagnosticPlanner,
         retriever: Retriever,
         coaching_evaluator: CoachingEvaluator,
-        anthropic_client: Optional[anthropic.Anthropic] = None,
-        model: str = "claude-haiku-3-5",
+        llm_client: Optional[LLMClient] = None,
+        model: Optional[str] = None,
         demo_mode: bool = False,
     ):
         self.extractor = symptom_extractor
         self.planner = diagnostic_planner
         self.retriever = retriever
         self.evaluator = coaching_evaluator
-        self.client = anthropic_client or anthropic.Anthropic()
-        self.model = model
+        # Provider/model/key come from .env unless a client is injected.
+        self.client = llm_client or LLMClient(model=model)
         self.demo_mode = demo_mode
 
         # Session state — reset per run()
@@ -331,6 +333,17 @@ IMPORTANT RULES:
         """
         self._reset(style)
 
+        # Defence in depth: the pipeline already runs ScopeGuard, but the
+        # agent refuses off-topic input too in case it is called directly.
+        from engine.scope_guard import ScopeGuard
+        verdict = ScopeGuard().check(user_message, conversation_history)
+        if not verdict["in_scope"]:
+            result = self._format_result(
+                status="out_of_scope",
+                clarification_question=verdict["message"],
+            )
+            return result
+
         # Build message list: inject history so the agent has full context.
         # History is summarised in a system note if it's long (>6 turns) to
         # avoid exceeding context limits while preserving what matters.
@@ -343,54 +356,43 @@ IMPORTANT RULES:
         for iteration in range(self.MAX_ITERATIONS):
             self._iteration = iteration + 1
 
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=2048,
-                system=self.SYSTEM_PROMPT,
-                tools=TOOLS,
+            response = self.client.create(
                 messages=messages,
+                system=self.SYSTEM_PROMPT,
+                max_tokens=2048,
+                tools=TOOLS,
             )
 
             # Log the agent's reasoning turn
             self._tool_call_log.append({
                 "iteration": self._iteration,
                 "stop_reason": response.stop_reason,
-                "content_blocks": [
-                    {"type": b.type, **({"text": b.text} if b.type == "text" else {})}
-                    for b in response.content
-                ],
+                "text": response.text,
             })
 
             # Natural end — agent decided it's done
-            if response.stop_reason == "end_turn":
+            if response.stop_reason != "tool_use":
                 break
 
             # Tool use — execute the requested tools
-            if response.stop_reason == "tool_use":
-                tool_results = []
+            tool_results = []
+            for call in response.tool_calls:
+                result = self._execute_tool(call.name, call.input, style)
 
-                for block in response.content:
-                    if block.type != "tool_use":
-                        continue
+                # Special case: ask_clarification halts the loop
+                if call.name == "ask_clarification":
+                    return self._format_result(
+                        status="clarification_needed",
+                        clarification_question=result["question"],
+                    )
 
-                    result = self._execute_tool(block.name, block.input, style)
+                tool_results.append(
+                    LLMClient.tool_result_message(call.id, json.dumps(result))
+                )
 
-                    # Special case: ask_clarification halts the loop
-                    if block.name == "ask_clarification":
-                        return self._format_result(
-                            status="clarification_needed",
-                            clarification_question=result["question"],
-                        )
-
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": json.dumps(result),
-                    })
-
-                # Add assistant turn + tool results to message history
-                messages.append({"role": "assistant", "content": response.content})
-                messages.append({"role": "user", "content": tool_results})
+            # Add assistant turn + tool results to message history
+            messages.append(LLMClient.assistant_message(response))
+            messages.extend(tool_results)
 
         # Return final coaching result
         return self._format_result(status="coaching")
@@ -512,18 +514,17 @@ IMPORTANT RULES:
         # Build a focused generation prompt with all context
         context_summary = self._build_generation_prompt(style)
 
-        inner_response = self.client.messages.create(
-            model=self.model,
-            max_tokens=1200,
+        inner_response = self.client.create(
+            messages=[{"role": "user", "content": context_summary}],
             system=(
                 "You are a barista coach. Generate a coaching response from the structured "
                 "context provided. Be specific, science-backed, and actionable. "
                 "Match the requested style. End with a validation test."
             ),
-            messages=[{"role": "user", "content": context_summary}],
+            max_tokens=1200,
         )
 
-        self._coaching_text = inner_response.content[0].text
+        self._coaching_text = inner_response.text
         return {"coaching_text": self._coaching_text, "word_count": len(self._coaching_text.split())}
 
     def _tool_validate_coaching(self, coaching_text: str) -> dict:
@@ -617,14 +618,13 @@ IMPORTANT RULES:
 
         prompt = f"{context_note}User question: {user_question}"
 
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=800,
-            system=system,
+        response = self.client.create(
             messages=[{"role": "user", "content": prompt}],
+            system=system,
+            max_tokens=800,
         )
 
-        answer = preamble + response.content[0].text
+        answer = preamble + response.text
         self._coaching_text = answer
 
         return {

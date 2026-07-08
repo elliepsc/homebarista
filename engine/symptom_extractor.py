@@ -12,10 +12,9 @@ Fixes vs. original plan:
 """
 
 import re
-import json
 from typing import Optional
-import anthropic
 
+from engine.llm_client import LLMClient, extract_json
 from engine.models import BrewingContext
 
 
@@ -193,22 +192,20 @@ class SymptomExtractor:
 
     Strategy:
     1. Rule-based extraction for everything we can detect with keywords + regex.
-    2. LLM fallback (claude-haiku) when machine_type is unknown OR
-       when zero symptoms were detected (not just machine fallback).
+    2. LLM fallback (provider/model from .env, see engine/llm_client.py) when
+       machine_type is unknown OR when zero symptoms were detected.
     3. Goal detection from signal words.
     """
 
     def __init__(
         self,
-        anthropic_client: Optional[anthropic.Anthropic] = None,
+        llm_client: Optional[LLMClient] = None,
         demo_mode: bool = False,
     ):
         self.demo_mode = demo_mode
-        # Lazy: only instantiate the real client when not in demo mode.
-        # anthropic.Anthropic() tries to connect immediately (proxy check etc.)
-        # which fails in sandboxed / no-API-key environments.
-        self.client = anthropic_client if anthropic_client is not None else (
-            None if demo_mode else anthropic.Anthropic()
+        # Demo mode never builds an LLM client — zero SDK imports, zero network.
+        self.client = llm_client if llm_client is not None else (
+            None if demo_mode else LLMClient()
         )
 
     # ------------------------------------------------------------------
@@ -378,7 +375,7 @@ class SymptomExtractor:
 
     def _llm_fallback(self, raw_text: str) -> dict:
         """
-        Call claude-haiku when rules fail to identify machine or symptoms.
+        Call the configured LLM when rules fail to identify machine or symptoms.
         Returns partial dict to merge with rule-based results.
         """
         prompt = f"""Analyse this coffee problem description and extract structured information.
@@ -393,12 +390,14 @@ Respond with ONLY valid JSON (no explanation):
 }}"""
 
         try:
-            response = self.client.messages.create(
-                model="claude-haiku-3-5",
-                max_tokens=200,
+            # 600 not 200: reasoning models (qwen3...) burn tokens on hidden
+            # chain-of-thought before emitting the JSON.
+            response = self.client.create(
                 messages=[{"role": "user", "content": prompt}],
+                max_tokens=600,
             )
-            return json.loads(response.content[0].text)
+            parsed = extract_json(response.text)
+            return parsed if parsed else {"machine_type": "unknown", "symptoms": []}
         except Exception as e:
             print(f"  [LLM fallback failed: {e}]")
             return {"machine_type": "unknown", "symptoms": []}

@@ -6,7 +6,8 @@ Single entry point for HomeBarista Coach.
 Two modes:
 1. AGENT mode (default): uses HomeBaristaAgent with tool-use loop.
    The LLM decides the flow — true agentic architecture.
-   Requires ANTHROPIC_API_KEY.
+   Requires an LLM API key (GROQ_API_KEY by default — see .env.example
+   and engine/llm_client.py for the provider/model configuration).
 
 2. LINEAR mode (fallback/CI): deterministic pipeline without LLM agency.
    Used in demo mode and tests to avoid API calls.
@@ -23,18 +24,22 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal, Optional
-
-import anthropic
+from typing import TYPE_CHECKING, Literal, Optional
 
 from engine.models import BrewingContext, CoachingSession
+from engine.scope_guard import ScopeGuard
 from engine.symptom_extractor import SymptomExtractor
 from engine.diagnostic_planner import DiagnosticPlanner
-from ingestion.embedder import Embedder
-from pipeline.vector_store import VectorStore
-from pipeline.retriever import Retriever
 from engine.coaching_evaluator import CoachingEvaluator
-from orchestration.agent import HomeBaristaAgent
+
+# Heavy imports (sentence-transformers, chromadb, LLM SDKs) are deferred to
+# _get_components: an out-of-scope request refused by the ScopeGuard must not
+# pay for loading embedding models or SDK clients.
+if TYPE_CHECKING:
+    from ingestion.embedder import Embedder
+    from orchestration.agent import HomeBaristaAgent
+    from pipeline.retriever import Retriever
+    from pipeline.vector_store import VectorStore
 
 
 # ------------------------------------------------------------------
@@ -52,18 +57,48 @@ logger = logging.getLogger("pipeline")
 # Component initialisation (lazy singletons)
 # ------------------------------------------------------------------
 
-_embedder:   Optional[Embedder]   = None
-_store:      Optional[VectorStore] = None
-_retriever:  Optional[Retriever]  = None
+_embedder:   Optional["Embedder"]   = None
+_store:      Optional["VectorStore"] = None
+_retriever:  Optional["Retriever"]  = None
 _extractor:  Optional[SymptomExtractor]  = None
 _planner:    Optional[DiagnosticPlanner] = None
 _evaluator:  Optional[CoachingEvaluator] = None
-_agent:      Optional[HomeBaristaAgent]  = None
+_agent:      Optional["HomeBaristaAgent"]  = None
+_llm_api_key: Optional[str] = None   # key the LLM-bound singletons were built with
+_components_demo: Optional[bool] = None  # demo_mode the singletons were built with
 
 
-def _get_components(demo_mode: bool, use_cross_encoder: bool = True):
+def _get_components(
+    demo_mode: bool,
+    use_cross_encoder: bool = True,
+    api_key: Optional[str] = None,
+):
     """Lazy-initialise all components. Reuse across requests."""
-    global _embedder, _store, _retriever, _extractor, _planner, _evaluator, _agent
+    global _embedder, _store, _retriever, _extractor, _planner, _evaluator
+    global _agent, _llm_api_key, _components_demo
+
+    from ingestion.embedder import Embedder
+    from orchestration.agent import HomeBaristaAgent
+    from pipeline.retriever import Retriever
+    from pipeline.vector_store import VectorStore
+
+    # Mode-dependent singletons must not survive a demo↔live switch:
+    # a store built in demo mode is in-memory and EMPTY — reusing it in
+    # live mode would silently retrieve nothing.
+    if demo_mode != _components_demo:
+        _store = None
+        _retriever = None
+        _extractor = None
+        _agent = None
+        _components_demo = demo_mode
+
+    # BYO key (Streamlit live mode): the key is passed per request, NEVER
+    # written to os.environ — an env-level key would leak to every other
+    # user of the same process. Rebuild LLM-bound components on key change.
+    if api_key != _llm_api_key:
+        _extractor = None
+        _agent = None
+        _llm_api_key = api_key
 
     if _embedder is None:
         _embedder = Embedder()
@@ -79,7 +114,11 @@ def _get_components(demo_mode: bool, use_cross_encoder: bool = True):
         )
 
     if _extractor is None:
-        _extractor = SymptomExtractor(demo_mode=demo_mode)
+        llm_client = None
+        if not demo_mode:
+            from engine.llm_client import LLMClient
+            llm_client = LLMClient(api_key=api_key)
+        _extractor = SymptomExtractor(llm_client=llm_client, demo_mode=demo_mode)
 
     if _planner is None:
         _planner = DiagnosticPlanner()
@@ -88,11 +127,13 @@ def _get_components(demo_mode: bool, use_cross_encoder: bool = True):
         _evaluator = CoachingEvaluator()
 
     if _agent is None and not demo_mode:
+        from engine.llm_client import LLMClient
         _agent = HomeBaristaAgent(
             symptom_extractor=_extractor,
             diagnostic_planner=_planner,
             retriever=_retriever,
             coaching_evaluator=_evaluator,
+            llm_client=LLMClient(api_key=api_key),
             demo_mode=demo_mode,
         )
 
@@ -109,6 +150,7 @@ async def run_pipeline(
     demo_mode: bool = True,
     use_agent: bool = True,
     conversation_history: Optional[list[dict]] = None,
+    api_key: Optional[str] = None,
 ) -> dict:
     """
     Run the HomeBarista coaching pipeline.
@@ -122,10 +164,12 @@ async def run_pipeline(
         conversation_history:  prior turns as [{role, content}, ...].
                                Passed to the agent so it remembers machine,
                                beans, and adjustments already tried.
+        api_key:               optional per-request LLM key (Streamlit BYO
+                               key). Kept out of os.environ on purpose.
 
     Returns:
         {
-            "status":                 "coaching" | "clarification_needed" | "error"
+            "status":                 "coaching" | "clarification_needed" | "error" | "out_of_scope"
             "coaching_text":          str
             "clarification_question": str
             "context":                dict
@@ -144,7 +188,17 @@ async def run_pipeline(
     if not raw_problem:
         return _error_result(session_id, "Please describe your coffee problem.")
 
-    extractor, planner, retriever, evaluator, agent = _get_components(demo_mode)
+    # ScopeGuard FIRST — before _get_components, so an off-topic request
+    # never loads embedding models and never spends a single LLM token.
+    verdict = ScopeGuard().check(raw_problem, conversation_history)
+    if not verdict["in_scope"]:
+        result = _out_of_scope_result(session_id, verdict["message"])
+        _log_session(session_id, raw_problem, result)
+        return result
+
+    extractor, planner, retriever, evaluator, agent = _get_components(
+        demo_mode, api_key=api_key
+    )
 
     try:
         if use_agent and not demo_mode and agent is not None:
@@ -163,13 +217,20 @@ async def run_pipeline(
             result = await _run_linear(
                 raw_problem, coach_style, session_id,
                 extractor, planner, retriever, evaluator, demo_mode,
+                api_key=api_key,
             )
 
     except ValueError as e:
+        # ValueError carries user-facing guidance (too vague, blocked, ...)
         return _error_result(session_id, str(e))
-    except Exception as e:
+    except Exception:
+        # Never surface internals (paths, config, provider errors) to the UI.
         logger.exception(f"Session {session_id} failed")
-        return _error_result(session_id, f"Internal error: {e}")
+        return _error_result(
+            session_id,
+            "Something went wrong on our side. Please try again — "
+            f"reference: session {session_id}.",
+        )
 
     # Log session
     _log_session(session_id, raw_problem, result)
@@ -183,9 +244,10 @@ async def _run_linear(
     session_id: str,
     extractor: SymptomExtractor,
     planner: DiagnosticPlanner,
-    retriever: Retriever,
+    retriever: "Retriever",
     evaluator: CoachingEvaluator,
     demo_mode: bool,
+    api_key: Optional[str] = None,
 ) -> dict:
     """
     Linear pipeline: fixed order, no LLM agency.
@@ -225,7 +287,7 @@ async def _run_linear(
 
     # Step 6 — Generate coaching (linear: direct prompt, no tool loop)
     coaching_text = _generate_coaching_linear(
-        context, diagnostic, chunks, coach_style, demo_mode
+        context, diagnostic, chunks, coach_style, demo_mode, api_key=api_key
     )
 
     # Step 7 — Post-generation eval
@@ -255,12 +317,15 @@ def _generate_coaching_linear(
     chunks: list[dict],
     style: str,
     demo_mode: bool,
+    api_key: Optional[str] = None,
 ) -> str:
-    """Generate coaching text via direct Anthropic call (no agent loop)."""
+    """Generate coaching text via a direct LLM call (no agent loop)."""
     if demo_mode:
         return _demo_coaching(context, diagnostic)
 
-    client = anthropic.Anthropic()
+    from engine.llm_client import LLMClient
+
+    client = LLMClient(api_key=api_key)
     chunks_text = "\n\n".join(
         f"[{c.get('channel', '')} — {c.get('title', '')}]\n{c.get('text', '')[:400]}"
         for c in chunks[:3]
@@ -281,16 +346,15 @@ STYLE: {style}
 RULES: Give specific measurements. Explain WHY. End with a validation test.
 """
 
-    response = client.messages.create(
-        model="claude-haiku-3-5",
-        max_tokens=1200,
+    response = client.create(
+        messages=[{"role": "user", "content": prompt}],
         system=(
             "You are HomeBarista Coach. Generate specific, science-backed barista coaching. "
             "Always include measurements, explain the root cause, end with a validation test."
         ),
-        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1200,
     )
-    return response.content[0].text
+    return response.text
 
 
 def _demo_coaching(context: BrewingContext, diagnostic) -> str:
@@ -303,7 +367,8 @@ def _demo_coaching(context: BrewingContext, diagnostic) -> str:
         f"[DEMO MODE] Based on your {context.machine_type} coffee problem ({symptom}), "
         f"the most likely cause is {cause}.\n\n"
         f"Recommended first step: {action}\n\n"
-        f"To see real AI-powered coaching, set DEMO_MODE=false and provide your ANTHROPIC_API_KEY."
+        f"To see real AI-powered coaching, set DEMO_MODE=false and configure an LLM key "
+        f"in .env (GROQ_API_KEY by default — see .env.example)."
     )
 
 
@@ -336,6 +401,21 @@ def _log_session(session_id: str, raw_problem: str, result: dict) -> None:
         logger.warning(f"Failed to log session: {e}")
 
 
+def _out_of_scope_result(session_id: str, message: str) -> dict:
+    return {
+        "status": "out_of_scope",
+        "coaching_text": "",
+        "clarification_question": message,
+        "context": {},
+        "diagnostic": {},
+        "retrieved_chunks": [],
+        "evaluation": {},
+        "session_id": session_id,
+        "tool_call_log": [],
+        "iterations": 0,
+    }
+
+
 def _error_result(session_id: str, message: str) -> dict:
     return {
         "status": "error",
@@ -357,6 +437,9 @@ def _error_result(session_id: str, message: str) -> dict:
 
 if __name__ == "__main__":
     import sys
+
+    from dotenv import load_dotenv
+    load_dotenv()  # LLM_* config from .env (see .env.example)
 
     problem = " ".join(sys.argv[1:]) or "my DeLonghi Dinamica makes bitter espresso"
     result = asyncio.run(run_pipeline(problem, demo_mode=True))

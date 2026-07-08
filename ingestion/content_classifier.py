@@ -5,8 +5,6 @@ Classifies coffee video documents by domain, method, and difficulty.
 Used by run_ingestion.py to filter low-confidence (non-coffee) content.
 """
 
-import json
-import os
 import re
 from typing import Optional
 
@@ -53,7 +51,6 @@ ADVANCED_SIGNALS = [
     "SCA", "TDS", "EY", "refractometer", "barista championship", "Scott Rao",
 ]
 
-_LLM_MODEL = "claude-3-5-haiku-20241022"
 _FIELD_WEIGHTS = {"title": 4, "description": 2, "tags": 3, "transcript": 1}
 
 
@@ -176,13 +173,13 @@ class ContentClassifier:
     def _classify_with_llm(self, doc: dict) -> Optional[dict]:
         """LLM fallback for low-confidence docs. Returns {domain, method} or None."""
         try:
-            import anthropic
+            # Provider/model/key from .env — see engine/llm_client.py
+            from engine.llm_client import LLMClient, extract_json, get_api_key
 
-            api_key = os.environ.get("ANTHROPIC_API_KEY")
-            if not api_key:
+            if not get_api_key():
                 return None
 
-            client = anthropic.Anthropic(api_key=api_key)
+            client = LLMClient()
             fields = self._extract_fields(doc)
 
             domain_list = list(DOMAIN_SIGNALS.keys())
@@ -197,16 +194,11 @@ class ContentClassifier:
                 f"Transcript excerpt: {fields['transcript'][:300]}"
             )
 
-            message = client.messages.create(
-                model=_LLM_MODEL,
-                max_tokens=64,
+            response = client.create(
                 messages=[{"role": "user", "content": prompt}],
+                max_tokens=64,
             )
-
-            text = message.content[0].text.strip()
-            match = re.search(r"\{[^}]+\}", text)
-            if match:
-                return json.loads(match.group())
+            return extract_json(response.text)
         except Exception:
             pass
         return None
