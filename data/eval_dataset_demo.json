@@ -1,0 +1,92 @@
+[
+  {
+    "query_id": "demo_q001",
+    "synthetic_query": "My espresso tastes really bitter every morning, what am I doing wrong?",
+    "relevant_chunk_ids": [
+      "mock_001_a2aff882"
+    ],
+    "machine_type": "espresso",
+    "domain": "troubleshoot"
+  },
+  {
+    "query_id": "demo_q002",
+    "synthetic_query": "The shots from my machine come out sour and sharp, how do I fix that?",
+    "relevant_chunk_ids": [
+      "mock_002_aff6ec3d"
+    ],
+    "machine_type": "espresso",
+    "domain": "troubleshoot"
+  },
+  {
+    "query_id": "demo_q003",
+    "synthetic_query": "I barely get any crema on my espresso and it disappears right away.",
+    "relevant_chunk_ids": [
+      "mock_003_53eed99f"
+    ],
+    "machine_type": "espresso",
+    "domain": "troubleshoot"
+  },
+  {
+    "query_id": "demo_q004",
+    "synthetic_query": "How much does grind size actually change the taste of my coffee?",
+    "relevant_chunk_ids": [
+      "mock_011_a507f8d6"
+    ],
+    "machine_type": "general",
+    "domain": "grind"
+  },
+  {
+    "query_id": "demo_q005",
+    "synthetic_query": "I just bought a DeLonghi bean-to-cup machine, how should I set it up?",
+    "relevant_chunk_ids": [
+      "mock_018_522a456d"
+    ],
+    "machine_type": "super_automatic",
+    "domain": "machine"
+  },
+  {
+    "query_id": "demo_q006",
+    "synthetic_query": "How often do I need to descale my espresso machine and why?",
+    "relevant_chunk_ids": [
+      "mock_022_69ba3237"
+    ],
+    "machine_type": "super_automatic",
+    "domain": "machine"
+  },
+  {
+    "query_id": "demo_q007",
+    "synthetic_query": "Coffee from my moka pot is bitter and harsh, what should I change?",
+    "relevant_chunk_ids": [
+      "mock_027_2779782a"
+    ],
+    "machine_type": "moka",
+    "domain": "troubleshoot"
+  },
+  {
+    "query_id": "demo_q008",
+    "synthetic_query": "Can you give me a simple V60 pour over recipe for a beginner?",
+    "relevant_chunk_ids": [
+      "mock_032_db3e318f"
+    ],
+    "machine_type": "v60",
+    "domain": "method"
+  },
+  {
+    "query_id": "demo_q009",
+    "synthetic_query": "My Aeropress coffee turns out bitter, which settings should I adjust?",
+    "relevant_chunk_ids": [
+      "mock_035_9af86249"
+    ],
+    "machine_type": "aeropress",
+    "domain": "troubleshoot"
+  },
+  {
+    "query_id": "demo_q010",
+    "synthetic_query": "What is the real difference between light roast and dark roast coffee?",
+    "relevant_chunk_ids": [
+      "mock_038_2b2f9ade"
+    ],
+    "machine_type": "general",
+    "domain": "origin"
+  }
+]

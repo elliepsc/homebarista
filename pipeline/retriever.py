@@ -12,9 +12,14 @@ Fixes vs. original plan:
 3. Machine-to-method mapping is explicit and documented.
 4. Re-ranking justification: cross-encoders evaluate (query, passage) joint
    relevance — more accurate than bi-encoder cosine similarity alone.
+5. Hybrid search (ultraplan v3, Phase B): optional BM25 keyword search fused
+   with the vector search via Reciprocal Rank Fusion (RRF, k=60), before the
+   cross-encoder stage. Enabled with search_mode="hybrid". BM25 tokenisation
+   is deliberately simple (text.lower().split()) — good enough for RRF where
+   only ranks matter, and dependency-free beyond rank-bm25.
 """
 
-from typing import Optional
+from typing import Literal, Optional
 
 from engine.models import BrewingContext, DiagnosticResult
 from ingestion.embedder import Embedder
@@ -59,11 +64,19 @@ class Retriever:
         vector_store: VectorStore,
         use_cross_encoder: bool = True,
         cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-12-v2",
+        search_mode: Literal["vector", "hybrid"] = "vector",
     ):
         self.embedder = embedder
         self.store = vector_store
         self.use_cross_encoder = use_cross_encoder
         self._cross_encoder = None
+        # Hybrid search (BM25 + vector, RRF fusion). Default stays "vector"
+        # until the Phase D retrieval evaluation picks a winner.
+        self.search_mode = search_mode
+        self._bm25 = None
+        self._bm25_ids: list[str] = []
+        self._bm25_docs: list[str] = []
+        self._bm25_meta: list[dict] = []
 
         if use_cross_encoder:
             try:
@@ -112,13 +125,20 @@ class Retriever:
         # Build metadata filter
         where = self._build_filter(brewing_context.machine_type)
 
-        # Stage 1 — bi-encoder search
+        # Stage 1 — bi-encoder search (+ optional BM25 fused via RRF)
         query_embedding = self.embedder.embed_query(query)
         candidates = self.store.query(
             embedding=query_embedding,
             n_results=n_candidates,
             where=where,
         )
+
+        if self.search_mode == "hybrid":
+            # NOTE: the metadata `where` filter only applies to the vector
+            # side — BM25 searches the full corpus. RRF fusion then favours
+            # chunks found by both retrievers.
+            bm25_candidates = self._bm25_search(query, n_candidates)
+            candidates = self._rrf_fuse(candidates, bm25_candidates)[:n_candidates]
 
         if not candidates:
             return []
@@ -135,6 +155,60 @@ class Retriever:
             chunk["retrieval_rank"] = i + 1
 
         return ranked
+
+    # ------------------------------------------------------------------
+    # Hybrid search — BM25 + RRF fusion
+    # ------------------------------------------------------------------
+
+    def _ensure_bm25(self) -> None:
+        """Build the BM25 index lazily from all chunks in the store (once)."""
+        if self._bm25 is not None:
+            return
+        from rank_bm25 import BM25Okapi
+
+        data = self.store.collection.get(include=["documents", "metadatas"])
+        self._bm25_ids = data["ids"]
+        self._bm25_docs = data["documents"]
+        self._bm25_meta = data["metadatas"]
+        tokenized = [d.lower().split() for d in self._bm25_docs]
+        self._bm25 = BM25Okapi(tokenized)
+
+    def _bm25_search(self, query: str, n: int) -> list[dict]:
+        """Keyword search over the full corpus. Returns top-n chunk dicts."""
+        self._ensure_bm25()
+        if not self._bm25_ids:
+            return []
+        scores = self._bm25.get_scores(query.lower().split())
+        top = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:n]
+        return [
+            {
+                "chunk_id": self._bm25_ids[i],
+                "text": self._bm25_docs[i],
+                "bm25_score": float(scores[i]),
+                "semantic_score": 0.0,
+                **self._bm25_meta[i],
+            }
+            for i in top
+        ]
+
+    @staticmethod
+    def _rrf_fuse(
+        vector_results: list[dict], bm25_results: list[dict], k: int = 60
+    ) -> list[dict]:
+        """
+        Reciprocal Rank Fusion: doc score = sum over lists of 1/(k + rank),
+        rank 1-indexed, absent from a list → no contribution. Chunks found
+        by BOTH retrievers therefore rank above single-list chunks.
+        """
+        fused: dict[str, dict] = {}
+        for results in (vector_results, bm25_results):
+            for rank, chunk in enumerate(results, start=1):
+                entry = fused.setdefault(chunk["chunk_id"], {**chunk, "rrf_score": 0.0})
+                entry["rrf_score"] += 1.0 / (k + rank)
+                # Keep the richest field values (e.g. real semantic_score
+                # from the vector list over the BM25 placeholder 0.0).
+                entry.update({key: v for key, v in chunk.items() if not entry.get(key)})
+        return sorted(fused.values(), key=lambda c: c["rrf_score"], reverse=True)
 
     # ------------------------------------------------------------------
     # Query builder
