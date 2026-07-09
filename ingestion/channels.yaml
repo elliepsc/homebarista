@@ -1,3 +1,5 @@
+# Channel IDs verified against the live YouTube Data API on 2026-07-09 —
+# 4 of 5 were stale/wrong before this (only James Hoffmann's resolved).
 channels:
   - id: UCMb0O2CdPBNi-QqPk5T3gsQ
     name: James Hoffmann
@@ -5,25 +7,25 @@ channels:
     priority: critical
     max_videos: 80
 
-  - id: UCbS5dZ7rVAGBWMQGbMBZCcg
+  - id: UCJU9iETMJiodV65F9U9M8jA
     name: Barista Hustle
     tags: [extraction, sca, professional, technique, science]
     priority: critical
     max_videos: 50
 
-  - id: UCVuB_6YFD7-lrHoqnHCg2Lg
+  - id: UCR2_8uHyWcTSV6iIw6BN4rg
     name: Lance Hedrick
     tags: [espresso, dialing_in, equipment, super_automatic, grind]
     priority: high
     max_videos: 40
 
-  - id: UCn3jcZBFRhAHAC4Xr9sTkQQ
+  - id: UC3KGOt3IfrVxDNtz5o7H-5A
     name: European Coffee Trip
     tags: [origin, roasting, specialty, method]
     priority: medium
     max_videos: 30
 
-  - id: UCo4VPxVEiPSDljgcXIe5RJA
+  - id: UCCyw4GaWJHezSUowFJ_uH0A
     name: Tim Wendelboe
     tags: [filter, origin, technique, professional]
     priority: medium

@@ -87,7 +87,7 @@ def test_transcript_fetch_missing():
     fetcher = TranscriptFetcher()
 
     with patch(_TRANSCRIPT_API) as mock_api:
-        mock_api.list_transcripts.side_effect = NoTranscriptFound(
+        mock_api.return_value.list.side_effect = NoTranscriptFound(
             "vid", [], {}
         )
         result_text, available = fetcher.fetch_transcript(
@@ -106,28 +106,30 @@ def test_transcript_fetch_disabled():
     fetcher = TranscriptFetcher()
 
     with patch(_TRANSCRIPT_API) as mock_api:
-        mock_api.list_transcripts.side_effect = TranscriptsDisabled("vid")
+        mock_api.return_value.list.side_effect = TranscriptsDisabled("vid")
         result_text, available = fetcher.fetch_transcript("disabled_video")
 
     assert available is False
     assert result_text is None
 
 
-def test_transcript_fetch_success():
+def test_transcript_fetch_success(monkeypatch):
+    # Guards against DEMO_MODE leaking in from .env via another test's import
+    # of app.streamlit_app (which calls load_dotenv() at module scope).
+    monkeypatch.setenv("DEMO_MODE", "false")
     from ingestion.transcript_fetcher import TranscriptFetcher
 
     fetcher = TranscriptFetcher()
 
+    mock_snippet_1 = MagicMock(text="Hello coffee world")
+    mock_snippet_2 = MagicMock(text="grind size matters")
     mock_transcript = MagicMock()
-    mock_transcript.fetch.return_value = [
-        {"text": "Hello coffee world", "start": 0.0, "duration": 2.0},
-        {"text": "grind size matters", "start": 2.0, "duration": 2.0},
-    ]
+    mock_transcript.fetch.return_value = [mock_snippet_1, mock_snippet_2]
     mock_list = MagicMock()
     mock_list.find_transcript.return_value = mock_transcript
 
     with patch(_TRANSCRIPT_API) as mock_api:
-        mock_api.list_transcripts.return_value = mock_list
+        mock_api.return_value.list.return_value = mock_list
         text, available = fetcher.fetch_transcript("good_video")
 
     assert available is True

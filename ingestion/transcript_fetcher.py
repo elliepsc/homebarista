@@ -25,7 +25,7 @@ class TranscriptFetcher:
             return None, False
 
         try:
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            transcript_list = YouTubeTranscriptApi().list(video_id)
             try:
                 transcript = transcript_list.find_transcript(["en"])
             except NoTranscriptFound:
@@ -35,7 +35,7 @@ class TranscriptFetcher:
                     return None, False
 
             snippets = transcript.fetch()
-            text = " ".join(s["text"] for s in snippets)
+            text = " ".join(s.text for s in snippets)
             return text, True
 
         except Exception:
