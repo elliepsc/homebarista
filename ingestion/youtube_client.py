@@ -22,8 +22,19 @@ def _iso8601_duration_to_seconds(duration: str) -> int:
 
 
 class YouTubeClient:
-    def __init__(self):
-        if os.getenv("DEMO_MODE", "").lower() == "true":
+    def __init__(self, demo_mode: bool | None = None):
+        """
+        demo_mode: explicit override (e.g. from run_ingestion.py's --demo CLI
+        flag). When None, falls back to the DEMO_MODE env var — but an
+        explicit caller-supplied value always wins, so a live ingestion run
+        can't be silently forced into demo mode by .env's DEMO_MODE=true
+        (the Streamlit app's default).
+        """
+        if demo_mode is None:
+            demo_mode = os.getenv("DEMO_MODE", "").lower() == "true"
+        self.demo_mode = demo_mode
+
+        if self.demo_mode:
             self.service = None
         else:
             from googleapiclient.discovery import build
@@ -45,7 +56,7 @@ class YouTubeClient:
         Handles pagination up to max_results. Logs quota.
         Quota cost: ~100 units per search page + 1 unit per video (batched by 50).
         """
-        if os.getenv("DEMO_MODE", "").lower() == "true":
+        if self.demo_mode:
             logger.info("DEMO_MODE: skipping YouTube API call for channel %s", channel_id)
             return [], 0
 
@@ -88,7 +99,7 @@ class YouTubeClient:
         self, playlist_id: str, max_results: int = 50
     ) -> tuple[list[dict], int]:
         """Same format as get_channel_videos."""
-        if os.getenv("DEMO_MODE", "").lower() == "true":
+        if self.demo_mode:
             logger.info("DEMO_MODE: skipping YouTube API call for playlist %s", playlist_id)
             return [], 0
 
