@@ -31,11 +31,14 @@ channels:
     priority: medium
     max_videos: 20
 
+# Playlist IDs verified against the live YouTube Data API on 2026-07-10 —
+# both were stale/wrong before this (playlistNotFound); neither title
+# existed verbatim on the channel, replaced with the closest real playlist.
 playlists:
-  - id: PLynbSsRRLfnoR4CZrRlhvkbY1xPQ5e7Py
-    name: "James Hoffmann - How to make better coffee"
+  - id: PLxz0FjZMVOl0sUXHoxf7sR37D-qtwAGne
+    name: "James Hoffmann - A Beginner's Guide to Coffee"
     tags: [beginner, technique, troubleshooting]
 
-  - id: PLynbSsRRLfnoV1HiYeF0n3CwDo2gm59Gx
-    name: "James Hoffmann - Espresso Machines"
+  - id: PLxz0FjZMVOl15gHRbhcZSDvlgUV4vxnp9
+    name: "James Hoffmann - Espresso"
     tags: [espresso, machine, equipment, super_automatic]
