@@ -133,9 +133,13 @@ def generate_dataset(n_queries: int = 50) -> None:
     for n, i in enumerate(indices, start=1):
         text = data["documents"][i]
         meta = data["metadatas"][i]
+        # 300 not 100: on Groq, reasoning models (gpt-oss default, qwen3
+        # fallback via LLM_BASE_URL) count hidden chain-of-thought tokens
+        # against max_tokens — reasoning_effort="low" keeps that budget small.
         response = client.create(
             messages=[{"role": "user", "content": GEN_PROMPT.format(passage=text[:400])}],
-            max_tokens=100,
+            max_tokens=300,
+            reasoning_effort="low",
         )
         query = response.text.strip()
         dataset.append({

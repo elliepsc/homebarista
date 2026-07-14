@@ -194,9 +194,14 @@ class ContentClassifier:
                 f"Transcript excerpt: {fields['transcript'][:300]}"
             )
 
+            # 300 not 64: on Groq, reasoning models (gpt-oss default, qwen3
+            # fallback via LLM_BASE_URL) count hidden chain-of-thought tokens
+            # against max_tokens, so a low cap here silently truncates to an
+            # empty response — reasoning_effort="low" keeps that budget small.
             response = client.create(
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=64,
+                max_tokens=300,
+                reasoning_effort="low",
             )
             return extract_json(response.text)
         except Exception:

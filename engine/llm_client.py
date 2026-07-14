@@ -112,10 +112,13 @@ def get_api_key(provider: Optional[str] = None) -> Optional[str]:
     return os.environ.get("LLM_API_KEY") or os.environ.get(KEY_ENV_VARS[provider])
 
 
-# Reasoning models (qwen3, deepseek-r1...) inline their chain of thought as
-# <think>...</think> before the answer. Strip it — users must never see it,
-# and JSON parsing must not trip on it. Handles the unclosed tag too (when
-# max_tokens truncates mid-reasoning).
+# Reasoning models that inline their chain of thought as <think>...</think>
+# before the answer (qwen3, deepseek-r1...) need it stripped — users must
+# never see it, and JSON parsing must not trip on it. Handles the unclosed
+# tag too (when max_tokens truncates mid-reasoning). No-op for gpt-oss (the
+# default Groq model): it returns reasoning in a separate response field,
+# not inline. Kept as a safety net for a qwen3 fallback via LLM_BASE_URL
+# (e.g. a self-hosted/OpenRouter endpoint).
 _THINK_RE = re.compile(r"<think>.*?(?:</think>|$)", re.DOTALL)
 
 
@@ -188,11 +191,19 @@ class LLMClient:
         system: Optional[str] = None,
         max_tokens: int = 1024,
         tools: Optional[list[dict]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> LLMResponse:
-        """One chat completion in the neutral format described above."""
+        """One chat completion in the neutral format described above.
+
+        reasoning_effort ("low"|"medium"|"high") is forwarded only to the
+        OpenAI-compatible backend (e.g. Groq's gpt-oss reasoning control) —
+        the Anthropic backend ignores it.
+        """
         if self.provider == "anthropic":
             return self._create_anthropic(messages, system, max_tokens, tools)
-        return self._create_openai_compatible(messages, system, max_tokens, tools)
+        return self._create_openai_compatible(
+            messages, system, max_tokens, tools, reasoning_effort
+        )
 
     @staticmethod
     def assistant_message(response: LLMResponse) -> dict:
@@ -229,7 +240,9 @@ class LLMClient:
             self._sdk_client = OpenAI(**kwargs)
         return self._sdk_client
 
-    def _create_openai_compatible(self, messages, system, max_tokens, tools):
+    def _create_openai_compatible(
+        self, messages, system, max_tokens, tools, reasoning_effort=None
+    ):
         oa_messages: list[dict] = []
         if system:
             oa_messages.append({"role": "system", "content": system})
@@ -272,6 +285,8 @@ class LLMClient:
                 }
                 for t in tools
             ]
+        if reasoning_effort:
+            kwargs["reasoning_effort"] = reasoning_effort
 
         completion = _with_rate_limit_retry(lambda: self._openai_client().chat.completions.create(
             model=self.model,

@@ -276,6 +276,40 @@ def test_anthropic_conversion_merges_tool_results(monkeypatch):
 
 
 # ------------------------------------------------------------------
+# reasoning_effort passthrough (OpenAI-compatible only, e.g. Groq gpt-oss)
+# ------------------------------------------------------------------
+
+def test_reasoning_effort_passthrough(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    client = LLMClient(api_key="k")
+    fake = FakeOpenAI(SimpleNamespace(content="ok", tool_calls=None))
+    client._sdk_client = fake
+
+    client.create([{"role": "user", "content": "hi"}], reasoning_effort="low")
+    assert fake.captured["reasoning_effort"] == "low"
+
+
+def test_reasoning_effort_absent_when_not_passed(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    client = LLMClient(api_key="k")
+    fake = FakeOpenAI(SimpleNamespace(content="ok", tool_calls=None))
+    client._sdk_client = fake
+
+    client.create([{"role": "user", "content": "hi"}])
+    assert "reasoning_effort" not in fake.captured
+
+
+def test_reasoning_effort_ignored_for_anthropic():
+    client = LLMClient(provider="anthropic", api_key="k")
+    fake = FakeAnthropic(SimpleNamespace(
+        content=[SimpleNamespace(type="text", text="ok")], stop_reason="end_turn"))
+    client._sdk_client = fake
+
+    client.create([{"role": "user", "content": "hi"}], reasoning_effort="low")
+    assert "reasoning_effort" not in fake.captured
+
+
+# ------------------------------------------------------------------
 # Neutral history helpers
 # ------------------------------------------------------------------
 

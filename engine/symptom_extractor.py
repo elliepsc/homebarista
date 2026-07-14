@@ -390,8 +390,9 @@ Respond with ONLY valid JSON (no explanation):
 }}"""
 
         try:
-            # 600 not 200: reasoning models (qwen3...) burn tokens on hidden
-            # chain-of-thought before emitting the JSON.
+            # 600 not 200: reasoning models on Groq (gpt-oss default, qwen3
+            # fallback via LLM_BASE_URL) burn tokens on hidden chain-of-thought
+            # before emitting the JSON.
             response = self.client.create(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=600,
