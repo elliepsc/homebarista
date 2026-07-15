@@ -25,10 +25,10 @@ Usage:
       # IP-blocked. Verifies playlist IDs and caches metadata for later runs.
 
 Env overrides (see ultraplan_v4.md A.7 G1/G3):
-  TRANSCRIPT_DELAY_S=10     pacing between transcript fetches (+/- jitter)
-  TRANSCRIPT_JITTER_S=3
-  MAX_VIDEOS_PER_RUN=30     hard cap on transcript fetches per run
-  YOUTUBE_QUOTA_BUDGET=8000 stop before exhausting the 10k/day free quota
+  TRANSCRIPT_DELAY_MIN_S=20   pacing between transcript fetches: random in [min, max]
+  TRANSCRIPT_DELAY_MAX_S=60
+  MAX_VIDEOS_PER_RUN=12       hard cap on transcript fetches per run
+  YOUTUBE_QUOTA_BUDGET=8000   stop before exhausting the 10k/day free quota
 """
 
 import argparse
@@ -64,21 +64,33 @@ QUOTA_PLAYLIST_PAGE = 1     # playlistItems.list per page
 # ------------------------------------------------------------------
 # Transcript pacing / run caps — see ultraplan_v4.md A.7 G3.
 # The 0.3s pacing below was calibrated for the official Data API, not the
-# unofficial transcript endpoint; bursts on it triggered a real IpBlocked
-# after ~30 fetches even from a residential IP. Defaults here are the
-# normative recovery values (10s pacing + jitter, 30 videos/run cap).
+# unofficial transcript endpoint. The 2026-07-14 run diagnosis revised the
+# earlier "persistent IP block" theory: even with 10s+/-3s pacing and 5 days
+# of waiting, IpBlocked still hit at the 19th transcript request — pointing
+# to a per-window VOLUME threshold (~15-20 transcript requests) rather than
+# a standing block. Defaults here stay under that threshold: a lower
+# per-run cap plus a wider, fully randomized delay range (not a small jitter
+# around a fixed mean). Relevance pre-filtering (so a capped run spends its
+# budget on relevant videos first) is a separate, later change.
 # Read via os.getenv() inside run_ingestion(), not at import time — main()
 # calls load_dotenv() lazily (not at module scope) to avoid leaking .env
 # into the shared pytest process, same reasoning as DEMO_MODE.
 # ------------------------------------------------------------------
 
-DEFAULT_TRANSCRIPT_DELAY_S  = 10.0
-DEFAULT_TRANSCRIPT_JITTER_S = 3.0
-DEFAULT_MAX_VIDEOS_PER_RUN  = 30
+DEFAULT_TRANSCRIPT_DELAY_MIN_S = 20.0
+DEFAULT_TRANSCRIPT_DELAY_MAX_S = 60.0
+DEFAULT_MAX_VIDEOS_PER_RUN     = 12
 
 # YouTube Data API free tier = 10,000 units/day. Budget stays comfortably
 # under that so a single run can never exhaust the free daily quota (G1).
 DEFAULT_YOUTUBE_QUOTA_BUDGET = 8000
+
+
+def _pacing_delay(delay_min_s: float, delay_max_s: float) -> float:
+    """Randomized delay (seconds) before the next transcript fetch — a full
+    random draw from [delay_min_s, delay_max_s], not a small jitter around a
+    fixed mean, to avoid a fingerprintable fixed-interval request pattern."""
+    return random.uniform(delay_min_s, delay_max_s)
 
 
 # ------------------------------------------------------------------
@@ -215,8 +227,8 @@ def fetch_real_documents(
     progress: dict,
     channel_filter: str = None,
     demo_mode: bool = False,
-    transcript_delay_s: float = DEFAULT_TRANSCRIPT_DELAY_S,
-    transcript_jitter_s: float = DEFAULT_TRANSCRIPT_JITTER_S,
+    transcript_delay_min_s: float = DEFAULT_TRANSCRIPT_DELAY_MIN_S,
+    transcript_delay_max_s: float = DEFAULT_TRANSCRIPT_DELAY_MAX_S,
     max_videos_per_run: int = DEFAULT_MAX_VIDEOS_PER_RUN,
     quota_budget: int = DEFAULT_YOUTUBE_QUOTA_BUDGET,
 ) -> tuple[list[dict], int, dict | None]:
@@ -311,8 +323,7 @@ def fetch_real_documents(
         return "ok"
 
     def pace() -> None:
-        delay = transcript_delay_s + random.uniform(-transcript_jitter_s, transcript_jitter_s)
-        time.sleep(max(0.0, delay))
+        time.sleep(_pacing_delay(transcript_delay_min_s, transcript_delay_max_s))
 
     for channel in channels_config:
         if channel_filter and channel["id"] != channel_filter:
@@ -401,8 +412,8 @@ def run_ingestion(
     channel_filter: str = None,
     reset: bool = False,
     metadata_only: bool = False,
-    transcript_delay_s: float = DEFAULT_TRANSCRIPT_DELAY_S,
-    transcript_jitter_s: float = DEFAULT_TRANSCRIPT_JITTER_S,
+    transcript_delay_min_s: float = DEFAULT_TRANSCRIPT_DELAY_MIN_S,
+    transcript_delay_max_s: float = DEFAULT_TRANSCRIPT_DELAY_MAX_S,
     max_videos_per_run: int = DEFAULT_MAX_VIDEOS_PER_RUN,
     quota_budget: int = DEFAULT_YOUTUBE_QUOTA_BUDGET,
 ) -> dict:
@@ -458,8 +469,8 @@ def run_ingestion(
         documents, quota_used, stop_reason = fetch_real_documents(
             channels_config, playlists_config, progress, channel_filter,
             demo_mode=demo_mode,
-            transcript_delay_s=transcript_delay_s,
-            transcript_jitter_s=transcript_jitter_s,
+            transcript_delay_min_s=transcript_delay_min_s,
+            transcript_delay_max_s=transcript_delay_max_s,
             max_videos_per_run=max_videos_per_run,
             quota_budget=quota_budget,
         )
@@ -645,8 +656,8 @@ def main():
         channel_filter=args.channel,
         reset=args.reset,
         metadata_only=args.metadata_only,
-        transcript_delay_s=float(os.getenv("TRANSCRIPT_DELAY_S", DEFAULT_TRANSCRIPT_DELAY_S)),
-        transcript_jitter_s=float(os.getenv("TRANSCRIPT_JITTER_S", DEFAULT_TRANSCRIPT_JITTER_S)),
+        transcript_delay_min_s=float(os.getenv("TRANSCRIPT_DELAY_MIN_S", DEFAULT_TRANSCRIPT_DELAY_MIN_S)),
+        transcript_delay_max_s=float(os.getenv("TRANSCRIPT_DELAY_MAX_S", DEFAULT_TRANSCRIPT_DELAY_MAX_S)),
         max_videos_per_run=int(os.getenv("MAX_VIDEOS_PER_RUN", DEFAULT_MAX_VIDEOS_PER_RUN)),
         quota_budget=int(os.getenv("YOUTUBE_QUOTA_BUDGET", DEFAULT_YOUTUBE_QUOTA_BUDGET)),
     )
