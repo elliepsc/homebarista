@@ -102,6 +102,20 @@ class ContentClassifier:
             doc.update(self.classify(doc))
         return docs
 
+    def score_relevance(self, doc: dict) -> float:
+        """
+        Heuristic-only relevance score for a video BEFORE its transcript is
+        fetched: same DOMAIN_SIGNALS/METHOD_SIGNALS keyword scoring as
+        classify(), but restricted to metadata already in hand (title,
+        description, tags — no transcript, no LLM call). Used to rank/skip
+        videos so a transcript fetch is only spent on ones that already show
+        coffee-relevant signal.
+        """
+        fields = self._extract_fields(doc)
+        domain_scores = self._score_signals(DOMAIN_SIGNALS, fields)
+        method_scores = self._score_signals(METHOD_SIGNALS, fields)
+        return sum(domain_scores.values()) + sum(method_scores.values())
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------

@@ -70,8 +70,10 @@ QUOTA_PLAYLIST_PAGE = 1     # playlistItems.list per page
 # to a per-window VOLUME threshold (~15-20 transcript requests) rather than
 # a standing block. Defaults here stay under that threshold: a lower
 # per-run cap plus a wider, fully randomized delay range (not a small jitter
-# around a fixed mean). Relevance pre-filtering (so a capped run spends its
-# budget on relevant videos first) is a separate, later change.
+# around a fixed mean), combined with relevance pre-filtering (see
+# _rank_by_relevance) so a capped run spends its transcript budget on
+# relevant videos first — the 2026-07-14 run only found 11/18 relevant
+# videos (39% of that run's quota fetched a transcript for nothing).
 # Read via os.getenv() inside run_ingestion(), not at import time — main()
 # calls load_dotenv() lazily (not at module scope) to avoid leaking .env
 # into the shared pytest process, same reasoning as DEMO_MODE.
@@ -91,6 +93,21 @@ def _pacing_delay(delay_min_s: float, delay_max_s: float) -> float:
     random draw from [delay_min_s, delay_max_s], not a small jitter around a
     fixed mean, to avoid a fingerprintable fixed-interval request pattern."""
     return random.uniform(delay_min_s, delay_max_s)
+
+
+def _rank_by_relevance(raw_docs: list[dict], classifier) -> list[dict]:
+    """
+    Score every video's metadata (title/description/tags — heuristic keyword
+    scoring via ContentClassifier.score_relevance, no transcript, no LLM
+    call) and return only the videos with a nonzero score, sorted highest
+    first. A video with zero domain/method keyword hits in its metadata
+    never reaches process_video, so it never consumes a transcript fetch —
+    the 2026-07-14 run wasted 39% of its quota on videos that turned out
+    irrelevant only after the transcript was already fetched.
+    """
+    scored = [(classifier.score_relevance(doc), doc) for doc in raw_docs]
+    relevant = sorted((sd for sd in scored if sd[0] > 0), key=lambda sd: sd[0], reverse=True)
+    return [doc for _, doc in relevant]
 
 
 # ------------------------------------------------------------------
@@ -354,6 +371,7 @@ def fetch_real_documents(
                 for v in videos
             ]
 
+        raw_docs = _rank_by_relevance(raw_docs, classifier)
         for doc in raw_docs:
             outcome = process_video(doc)
             if outcome in ("blocked", "capped"):
@@ -388,6 +406,7 @@ def fetch_real_documents(
                     for v in videos
                 ]
 
+            raw_docs = _rank_by_relevance(raw_docs, classifier)
             for doc in raw_docs:
                 outcome = process_video(doc)
                 if outcome in ("blocked", "capped"):
