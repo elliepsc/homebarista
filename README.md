@@ -50,13 +50,24 @@ Demo corpus (40 mock docs, 10 queries — reproducible in CI with `--demo`):
 | C3_hybrid_ce (BM25+vector RRF + cross-encoder) | 0.8 | 0.8 | 0.733 |
 | C4_raw_query_ce **(winner on demo corpus)** | 0.9 | 0.9 | 0.783 |
 
-<!-- TODO after live ingestion (Phase C/D): replace with the 50-query live-corpus table
-     and align the Retriever default with the winner. -->
-**Live corpus (50 synthetic queries): pending live ingestion — run
-`python -m evals.run_retrieval_eval --generate` then `--eval`.**
+Live corpus (50 synthetic queries, generated from the real ingested corpus — 55 chunks / 24 sources / 2 channels at eval time, 2026-07-17; full ~100-video corpus ingestion still in progress):
 
-- **C2 vs C4 is the query-rewriting evidence**: the Retriever rewrites the raw user message into a diagnostic-aware query (machine + symptom + root-cause hypothesis) via `_build_query`; the agent can also rewrite queries via `query_override`.
-- **C2 vs C3 is the hybrid-search evidence**: BM25 keyword search fused with vector search via Reciprocal Rank Fusion (k=60) before cross-encoder re-ranking.
+| Config | Hit Rate@5 | Hit Rate@10 | MRR |
+|---|---|---|---|
+| C1_vector_only | 0.22 | 0.38 | 0.154 |
+| C2_vector_ce (rewritten query + cross-encoder) | 0.20 | 0.34 | 0.137 |
+| C3_hybrid_ce (BM25+vector RRF + cross-encoder) | 0.26 | 0.40 | 0.170 |
+| C4_raw_query_ce **(winner)** | **0.86** | **0.86** | **0.835** |
+
+**Winner: C4_raw_query_ce**, by a wide margin. **Retriever default aligned**:
+the linear pipeline (`pipeline/pipeline.py`, used in demo mode/CI and as the
+non-agentic fallback) now passes the raw user message as `query_override`
+instead of letting the Retriever build a diagnostic-aware query. The
+Retriever's own defaults (`search_mode="vector"`, `use_cross_encoder=True`)
+already matched the winning config — no change needed there.
+
+- **C2 vs C4 is the query-rewriting evidence**: the Retriever rewrites the raw user message into a diagnostic-aware query (machine + symptom + root-cause hypothesis) via `_build_query`; the agent can also rewrite queries via `query_override`. On the live corpus, rewriting *hurts* retrieval — it abstracts away the specific vocabulary present in the transcript chunks.
+- **C2 vs C3 is the hybrid-search evidence**: BM25 keyword search fused with vector search via Reciprocal Rank Fusion (k=60) before cross-encoder re-ranking. Hybrid helps a little over vector-only, but not nearly as much as dropping the query rewrite.
 
 ### RAG / LLM — 3 prompts compared (`evals/run_rag_eval.py`)
 

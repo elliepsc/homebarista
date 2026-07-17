@@ -269,7 +269,10 @@ async def _run_linear(
         )
 
     # Step 4 — Retrieve
-    chunks = retriever.retrieve(context, diagnostic) if not demo_mode else _mock_chunks()
+    # query_override=raw_problem: the retrieval eval (README §3) found the raw
+    # user query beats the diagnostic-aware rewritten query (_build_query) by
+    # a wide margin (hit_rate@5 0.86 vs 0.2-0.26 on the live corpus).
+    chunks = retriever.retrieve(context, diagnostic, query_override=raw_problem) if not demo_mode else _mock_chunks()
     retrieval_metadata = {
         "chunks_retrieved": len(chunks),
         "avg_semantic_score": (
