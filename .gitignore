@@ -34,6 +34,9 @@ dist/
 logs/*
 !logs/*.sample.jsonl
 data/chroma_db/
+# G4: exported ChromaDB snapshot contains full YouTube transcript text
+# (third-party copyrighted content) — never committed to the public repo.
+data/chroma_snapshot/
 
 # Local notes and scratch docs
 docs-notes/
