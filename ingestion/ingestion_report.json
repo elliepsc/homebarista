@@ -1,29 +1,27 @@
 {
-  "run_at": "2026-07-08T14:37:19.328306+00:00",
-  "duration_seconds": 95.8,
+  "run_at": "2026-07-17T08:41:56.971064+00:00",
+  "duration_seconds": 409.1,
   "mode": "live",
-  "channel_filter": "UCCyw4GaWJHezSUowFJ_uH0A",
-  "videos_fetched": 12,
-  "videos_skipped_non_informative": 2,
-  "total_chunks_generated": 37,
-  "total_chunks_indexed": 37,
+  "channel_filter": "UC3KGOt3IfrVxDNtz5o7H-5A",
+  "videos_fetched": 11,
+  "videos_skipped_non_informative": 1,
+  "total_chunks_generated": 14,
+  "total_chunks_indexed": 55,
   "domain_distribution": {
-    "grind": 3,
-    "origin": 13,
-    "method": 16,
-    "machine": 2,
-    "troubleshooting": 2,
-    "extraction": 1
+    "method": 10,
+    "grind": 2,
+    "machine": 2
   },
   "method_distribution": {
-    "general": 8,
-    "espresso": 27,
-    "aeropress": 2
+    "aeropress": 4,
+    "espresso": 8,
+    "general": 2
   },
   "chunks_per_channel": {
-    "Tim Wendelboe": 37
+    "European Coffee Trip": 14
   },
-  "quota_used": 120,
+  "quota_used": 0,
+  "stop_reason": null,
   "embedding_model": "all-MiniLM-L6-v2",
   "chunk_size_tokens": 400,
   "overlap_tokens": 80

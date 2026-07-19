@@ -38,6 +38,11 @@ data/chroma_db/
 # (third-party copyrighted content) — never committed to the public repo.
 data/chroma_snapshot/
 
+# Ingestion runtime state — regenerable by a fresh run, not reproducibility-critical
+# (unlike data/eval_dataset.json and evals/results/*, which ARE committed — C3)
+ingestion/metadata_cache.json
+ingestion/progress.json
+
 # Local notes and scratch docs
 docs-notes/
 

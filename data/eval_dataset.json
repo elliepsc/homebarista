@@ -1,0 +1,452 @@
+[
+  {
+    "query_id": "q001",
+    "synthetic_query": "I’m trying to make a “dirty” coffee at home and I’m not sure the best way to pour the espresso into the milk—should I pour straight from the espresso spout, or is there a better method like using a spoon, and what’s the proper technique for each?",
+    "relevant_chunk_ids": [
+      "yOfLgqCPSqA_3d308613"
+    ],
+    "machine_type": "espresso",
+    "domain": "extraction"
+  },
+  {
+    "query_id": "q002",
+    "synthetic_query": "I'm a complete beginner trying to grow coffee in Norway and I'm not sure how to choose the right coffee beans or seeds—what should I look for when selecting the best varieties?",
+    "relevant_chunk_ids": [
+      "q-08PbyB9fk_9a969e5e"
+    ],
+    "machine_type": "espresso",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q003",
+    "synthetic_query": "If I’m using about 7 g of coffee and want a thinner, more “water‑y” cup, what coffee‑to‑water ratio should I aim for (how many grams of water should I use)?",
+    "relevant_chunk_ids": [
+      "FHExPHrJ7vo_29ecceae"
+    ],
+    "machine_type": "general",
+    "domain": "grind"
+  },
+  {
+    "query_id": "q004",
+    "synthetic_query": "Why do I keep stopping to check that my espresso tamp is flat and level on every few shots, even though it feels like I'm just wasting time?",
+    "relevant_chunk_ids": [
+      "F6ta8LBKZ1E_b9ac47ed"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q005",
+    "synthetic_query": "I have a tiny hand‑pulper at home and want to try a dry fermentation method for my coffee beans—no water, just letting them sit for about a day and then moving them to another container with a shovel. How exactly do I set this up and can the hobnail technique speed up the fermentation?",
+    "relevant_chunk_ids": [
+      "rk1Etop5h_g_8ead95a9"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q006",
+    "synthetic_query": "Why does the coffee I get from the farm near the city taste so clean and free of defects compared to beans from other regions?",
+    "relevant_chunk_ids": [
+      "rk1Etop5h_g_3326a4a0"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q007",
+    "synthetic_query": "What’s the best way to dry my home‑grown coffee beans—how long should they stay on a raised drying bed under a shade net before they’re ready to harvest?",
+    "relevant_chunk_ids": [
+      "rk1Etop5h_g_20ae5be8"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q008",
+    "synthetic_query": "I'm trying to experiment with fermenting my home‑grown coffee beans to bring out more body and flavor, but I'm not sure what the whole fermentation process is really about—can someone explain the basics of coffee processing and why fermentation matters?",
+    "relevant_chunk_ids": [
+      "q-08PbyB9fk_2131204b"
+    ],
+    "machine_type": "espresso",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q009",
+    "synthetic_query": "Why did you invite me to try different coffees after I missed making the semi‑finals by just a few points?",
+    "relevant_chunk_ids": [
+      "q-08PbyB9fk_d965b58c"
+    ],
+    "machine_type": "espresso",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q010",
+    "synthetic_query": "When I finish using my AeroPress, do I need to take the whole puck out and clean the whole chamber, or can I just push the plunger through and rinse it under the tap?",
+    "relevant_chunk_ids": [
+      "SCOSZwWIWJM_9a85aa73"
+    ],
+    "machine_type": "aeropress",
+    "domain": "method"
+  },
+  {
+    "query_id": "q011",
+    "synthetic_query": "I’m heading to Nairobi for a few days and I’m only there to cup coffee—what kind of coffee‑related activities (like visiting exporters or cupping sessions) can I realistically fit into a short 4‑day visit?",
+    "relevant_chunk_ids": [
+      "IAdtY6g5HYY_a776901e"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q012",
+    "synthetic_query": "Are there any good coffee shops in Bogotá or in nearby small coffee‑producing towns where I can try special coffee?",
+    "relevant_chunk_ids": [
+      "q-08PbyB9fk_688ce1b1"
+    ],
+    "machine_type": "espresso",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q013",
+    "synthetic_query": "I'm trying to make a Costa Rica coffee at home and want the exact recipe: how many grams of coffee and water should I use, what grind setting on my Commandante, and what's the step‑by‑step inverted pour‑over timing (bloom amount, bloom time, and when to finish the pour)?",
+    "relevant_chunk_ids": [
+      "8cXY8qMzWOc_d70241ad"
+    ],
+    "machine_type": "aeropress",
+    "domain": "method"
+  },
+  {
+    "query_id": "q014",
+    "synthetic_query": "I just opened a fresh bag of coffee that has a one‑way valve, and I’m not sure whether I should squeeze the bag to get the air out before resealing it—what’s the correct way to handle it?",
+    "relevant_chunk_ids": [
+      "5Gpbenbp-Tw_874a3e9b"
+    ],
+    "machine_type": "general",
+    "domain": "grind"
+  },
+  {
+    "query_id": "q015",
+    "synthetic_query": "Do you have any videos where you introduce yourself and talk about the barista team or what you’re doing in the shop?",
+    "relevant_chunk_ids": [
+      "q-08PbyB9fk_30929291"
+    ],
+    "machine_type": "espresso",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q016",
+    "synthetic_query": "I just bought the Hardtack cold‑brew machine that says it can make up to 4 L in under an hour, but I’m not sure how to start—what’s the exact step‑by‑step process for loading the coffee basket and how much coffee should I use?",
+    "relevant_chunk_ids": [
+      "ZP4EYt6bawQ_7412f247"
+    ],
+    "machine_type": "espresso",
+    "domain": "machine"
+  },
+  {
+    "query_id": "q017",
+    "synthetic_query": "I’m using the same Brazilian beans that are sold as both an espresso roast and a filter roast, but when I brew them at home I can’t tell why the espresso version is supposed to be wider, sweeter, and have more body and caramelization. How does the roasting process differ for espresso vs. filter, and what should I do when brewing each to bring out those characteristics?",
+    "relevant_chunk_ids": [
+      "Jgi44zWKjxQ_275aeb78"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q018",
+    "synthetic_query": "What’s the exact origin and processing details of the Hobnail coffee I bought—like which farm, region, and exporter are involved?",
+    "relevant_chunk_ids": [
+      "rk1Etop5h_g_09dd23d4"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q019",
+    "synthetic_query": "I'm having trouble getting a single cup of coffee that meets my taste standards—nothing seems to brew consistently, and the devices I try look weird and feel like cheap syringes. Is there a simple, affordable gadget that can help me brew a perfect cup at home?",
+    "relevant_chunk_ids": [
+      "k524VT70Jwk_ef332b59"
+    ],
+    "machine_type": "aeropress",
+    "domain": "method"
+  },
+  {
+    "query_id": "q020",
+    "synthetic_query": "I’m curious about the coffee subscription you send out each month—can you tell me what you’re featuring in the March tasting video and why it’s being recorded solo?",
+    "relevant_chunk_ids": [
+      "rAE8FN9LXUs_d064990f"
+    ],
+    "machine_type": "general",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q021",
+    "synthetic_query": "What coffee‑to‑water ratio, grind size, and brew method should I use when brewing Foley‑roasted beans with a Hario Switch at home?",
+    "relevant_chunk_ids": [
+      "RSy47UoR7Ts_1c8fe5c2"
+    ],
+    "machine_type": "v60",
+    "domain": "method"
+  },
+  {
+    "query_id": "q022",
+    "synthetic_query": "I'm trying to get into coffee competitions here in Colombia and eventually make it to the World Barista Championship, but it seems really tough—how difficult is it to compete and actually qualify for the finals?",
+    "relevant_chunk_ids": [
+      "q-08PbyB9fk_0dfd1f41"
+    ],
+    "machine_type": "espresso",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q023",
+    "synthetic_query": "Why does my instant coffee leave a bitter, rubbery, burnt aftertaste in my throat instead of a pleasant lingering flavor?",
+    "relevant_chunk_ids": [
+      "0vgrMhj129I_9c56989a"
+    ],
+    "machine_type": "general",
+    "domain": "extraction"
+  },
+  {
+    "query_id": "q024",
+    "synthetic_query": "I’m looking for the KCC exporters near Nairobi’s airport that sell the carrot coffees we’ve been buying—do you know where they are and if they’re still offering those coffees?",
+    "relevant_chunk_ids": [
+      "IAdtY6g5HYY_663753d2"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q025",
+    "synthetic_query": "Why does the iced coffee I got at a pop‑up coffee shop in Mexico taste so bitter, even though it’s supposed to be a cold‑filtered coffee with fruit flavors?",
+    "relevant_chunk_ids": [
+      "me1a3Z7GSbE_8d53e5de"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q026",
+    "synthetic_query": "Why do my coffee beans keep disappearing from my pantry, and how can I keep them from being stolen?",
+    "relevant_chunk_ids": [
+      "rk1Etop5h_g_93d6cedb"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q027",
+    "synthetic_query": "What grinder should I choose for my small coffee shop if I need to quickly adjust grind size for both hand‑brewed and batch‑brew drinks, want a silent machine, and need an easy way to clean out the grind chute during busy service?",
+    "relevant_chunk_ids": [
+      "MHgZpGHf1S0_1ee64a30"
+    ],
+    "machine_type": "general",
+    "domain": "grind"
+  },
+  {
+    "query_id": "q028",
+    "synthetic_query": "I keep noticing a sharp, bitter taste in my coffee and sometimes a tingling sensation on the sides of my tongue—are those two sensations caused by the same thing, or is bitterness different from acidity, and could it be because of the roast or something else?",
+    "relevant_chunk_ids": [
+      "xS6mKfxSG38_3be570d0"
+    ],
+    "machine_type": "general",
+    "domain": "troubleshooting"
+  },
+  {
+    "query_id": "q029",
+    "synthetic_query": "I’m trying to start roasting my own coffee at home and I’ve already harvested a few coffee cherries, but I’m not sure what equipment I need next—do I need a special grinder before I can roast the beans?",
+    "relevant_chunk_ids": [
+      "FHExPHrJ7vo_609c3b6d"
+    ],
+    "machine_type": "general",
+    "domain": "grind"
+  },
+  {
+    "query_id": "q030",
+    "synthetic_query": "How can I start learning to describe coffee flavors and improve my tasting skills?",
+    "relevant_chunk_ids": [
+      "xS6mKfxSG38_2d960783"
+    ],
+    "machine_type": "general",
+    "domain": "troubleshooting"
+  },
+  {
+    "query_id": "q031",
+    "synthetic_query": "I don’t have an espresso machine or any milk left—can I still make a foamy coffee drink at home using cheap ingredients, and if so, how should I do it?",
+    "relevant_chunk_ids": [
+      "W5mcrfXkyOc_d2fdbc2a"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q032",
+    "synthetic_query": "I just got a new coffee maker that arrived partially taken apart—how do I correctly reassemble it, especially where the filter seat and steel mesh (or paper) filter go?",
+    "relevant_chunk_ids": [
+      "0SbrozCwuhU_70ee423c"
+    ],
+    "machine_type": "aeropress",
+    "domain": "machine"
+  },
+  {
+    "query_id": "q033",
+    "synthetic_query": "When I’m using my Aeropress to make a latte‑style drink, I’m not sure how much water to add and why the coffee sometimes just streams straight through the chamber—what’s the proper water‑to‑coffee ratio and how can I make sure the coffee stays level so it brews correctly?",
+    "relevant_chunk_ids": [
+      "SCOSZwWIWJM_75f2bed9"
+    ],
+    "machine_type": "aeropress",
+    "domain": "method"
+  },
+  {
+    "query_id": "q034",
+    "synthetic_query": "I'm a barista getting into competitions and trying to figure out what my next steps should be—what goals should I set for myself, like which events to aim for and how to plan for the World Barista Championship?",
+    "relevant_chunk_ids": [
+      "q-08PbyB9fk_b642fa03"
+    ],
+    "machine_type": "espresso",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q035",
+    "synthetic_query": "I'm looking for a coffee farm or café in San Cristóbal where I can learn about espresso, work with small farmers, and maybe even stay for a while—does anything like that exist?",
+    "relevant_chunk_ids": [
+      "me1a3Z7GSbE_fea1c17c"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q036",
+    "synthetic_query": "Why am I only allowed to drink Colombian coffee when I'm in Colombia and can't import green coffee beans from other countries?",
+    "relevant_chunk_ids": [
+      "q-08PbyB9fk_cce4594e"
+    ],
+    "machine_type": "espresso",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q037",
+    "synthetic_query": "Why does my espresso taste uneven and sometimes weak even though I’m using a tamper, and could I be overthinking the tamping process?",
+    "relevant_chunk_ids": [
+      "F6ta8LBKZ1E_fb4f7a33"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q038",
+    "synthetic_query": "What’s the best way to wash my coffee equipment while brewing so I can keep the coffee tasting fresh and avoid any weird flavors?",
+    "relevant_chunk_ids": [
+      "rk1Etop5h_g_f119aa43"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q039",
+    "synthetic_query": "Who is the person in the Instagram post and what’s their background in coffee (roasting and barista experience)?",
+    "relevant_chunk_ids": [
+      "q-08PbyB9fk_0a3488e5"
+    ],
+    "machine_type": "espresso",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q040",
+    "synthetic_query": "I’m trying to get a consistent taste from my drip coffee maker, but I’m not sure how much coffee to use or how to handle the water level—should I be weighing the coffee and water, and is there anything I should do when the water reaches about 150 ml in the brew basket?",
+    "relevant_chunk_ids": [
+      "YH4wArAMJD0_06c8faed"
+    ],
+    "machine_type": "general",
+    "domain": "machine"
+  },
+  {
+    "query_id": "q041",
+    "synthetic_query": "Which coffees did you end up choosing from the 26 samples to be served at Noma in Mexico?",
+    "relevant_chunk_ids": [
+      "me1a3Z7GSbE_7cdd7660"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q042",
+    "synthetic_query": "I’ve heard that espresso and filter coffee need different roast profiles—do I actually have to roast the same beans differently for each brewing method, or can one roast work for both?",
+    "relevant_chunk_ids": [
+      "Jgi44zWKjxQ_ad18841f"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q043",
+    "synthetic_query": "I just got a new coffee maker that came in a box with a little arrow on it—how do I open it, assemble the parts, add the filter and coffee, and brew a cup (should I use a clear mug and how much coffee to use)?",
+    "relevant_chunk_ids": [
+      "SCOSZwWIWJM_90bc0119"
+    ],
+    "machine_type": "aeropress",
+    "domain": "method"
+  },
+  {
+    "query_id": "q044",
+    "synthetic_query": "I'm trying to understand why the coffee beans I bought from Caragoto Canyon are described as “pea berries” and why they seem smaller and sweeter than regular beans—can anyone explain what pea berry beans are and how they affect the flavor?",
+    "relevant_chunk_ids": [
+      "rAE8FN9LXUs_c403a84b"
+    ],
+    "machine_type": "general",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q045",
+    "synthetic_query": "What’s the proper way to process coffee cherries to keep the cascara, and can I dry‑wash the cascara myself after separating it from the beans?",
+    "relevant_chunk_ids": [
+      "q-08PbyB9fk_da24f0b1"
+    ],
+    "machine_type": "espresso",
+    "domain": "origin"
+  },
+  {
+    "query_id": "q046",
+    "synthetic_query": "I'm looking for coffee beans that come from a very high‑altitude farm with a long walk down to a lake view, like the ones from Nascimento, and I heard they have a fruity, sweet flavor with a Boar‑Bond‑like profile—do they also have a hybrid like SL 28 or the \"cutting mode\" variety that’s more resistant to leaf rust?",
+    "relevant_chunk_ids": [
+      "rk1Etop5h_g_1879fdd0"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q047",
+    "synthetic_query": "I have a bag of Kenyan coffee that just says it was “grown in the same little plot at CKCM” and mentions varieties like SL28 and SL34, but it doesn’t specify which one it is—can anyone tell me what specific Kenyan coffee this might be?",
+    "relevant_chunk_ids": [
+      "IAdtY6g5HYY_c17bcb36"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q048",
+    "synthetic_query": "I’m trying to make a cappuccino at home but I’m not sure how much espresso and milk to use, what the typical size should be, and how the foam-to‑coffee ratio affects the taste—can anyone explain the standard proportions and cup size?",
+    "relevant_chunk_ids": [
+      "rnACBWttzL0_a6abc264"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q049",
+    "synthetic_query": "I just got a new Swiss‑made espresso machine—can you tell me exactly what parts are included (like the portafilter, milk container, water tank, etc.) and what material they're made from?",
+    "relevant_chunk_ids": [
+      "hCuV9qlI3uY_ea8f3b61"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
+    "query_id": "q050",
+    "synthetic_query": "What time of year does the coffee harvest finish, so I know when I should stop ordering beans before the supply runs low?",
+    "relevant_chunk_ids": [
+      "rk1Etop5h_g_f61f0c0c"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  }
+]
