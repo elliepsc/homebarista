@@ -18,9 +18,12 @@ THE SOLUTION — two-mode architecture:
 HOW IT WORKS:
 - After ingestion locally: run `python -m pipeline.vector_store --export`
   → writes data/chroma_snapshot/ (a persisted ChromaDB directory)
-- Copy data/chroma_snapshot/ to private storage (never git) for deploy
-- On Streamlit Cloud startup: vector_store detects missing chroma_db/,
-  restores from the snapshot into a temp directory
+- Zip it and attach it as an asset to a DRAFT (never published) GitHub
+  release on this repo — a draft release's assets stay private even on a
+  public repo, unlike a published one (see SNAPSHOT_GITHUB_* below, C13)
+- On Streamlit Cloud startup: vector_store detects missing chroma_db/ and
+  missing local snapshot, downloads it from that draft release via the
+  GitHub API with a read-only PAT, then restores it into a temp directory
 - App works immediately without re-ingestion
 
 ALTERNATIVE (if snapshot too large for git):
@@ -28,12 +31,16 @@ Use Chroma Cloud free tier — swap CHROMA_MODE=cloud in .env,
 set CHROMA_CLOUD_API_KEY + CHROMA_CLOUD_COLLECTION_ID.
 """
 
+import io
+import json
 import os
 import shutil
-import json
 import tempfile
+import zipfile
 from pathlib import Path
 from typing import Optional
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import chromadb
 from chromadb.config import Settings
@@ -42,6 +49,80 @@ from chromadb.config import Settings
 COLLECTION_NAME = "barista_knowledge"
 SNAPSHOT_PATH = Path("data/chroma_snapshot")  # directory snapshot
 CHROMA_PERSIST_DIR = Path(os.getenv("CHROMA_PERSIST_DIR", "data/chroma_db"))
+SNAPSHOT_GITHUB_ASSET_DEFAULT = "chroma_snapshot.zip"
+
+
+# ------------------------------------------------------------------
+# Private snapshot delivery — Streamlit Cloud boot fetch (G4, C13)
+# ------------------------------------------------------------------
+# A published GitHub release is world-downloadable on a public repo no
+# matter what token you use — there's no such thing as a "private release"
+# on a public repo. A DRAFT release (created, never published) is the
+# actual private mechanism: its assets require repo-scoped auth to fetch,
+# regardless of repo visibility. So the deploy path is a draft release
+# holding the snapshot as a zip asset, pulled at boot via the GitHub API
+# with a fine-grained, read-only PAT. No-op unless every SNAPSHOT_GITHUB_*
+# env var is set, so local/CI dev is never affected.
+
+def _snapshot_release_config() -> Optional[dict]:
+    token = os.environ.get("SNAPSHOT_GITHUB_TOKEN")
+    repo = os.environ.get("SNAPSHOT_GITHUB_REPO")
+    release_id = os.environ.get("SNAPSHOT_GITHUB_RELEASE_ID")
+    if not (token and repo and release_id):
+        return None
+    return {
+        "token": token,
+        "repo": repo,
+        "release_id": release_id,
+        "asset": os.environ.get("SNAPSHOT_GITHUB_ASSET", SNAPSHOT_GITHUB_ASSET_DEFAULT),
+    }
+
+
+def _github_api_get(url: str, token: str, accept: str) -> bytes:
+    request = Request(url, headers={
+        "Authorization": f"Bearer {token}",
+        "Accept": accept,
+        "X-GitHub-Api-Version": "2022-11-28",
+    })
+    with urlopen(request, timeout=30) as response:
+        return response.read()
+
+
+def fetch_snapshot_from_github_release(dest_dir: Path) -> bool:
+    """
+    Download the ChromaDB snapshot from a draft GitHub release asset and
+    extract it into dest_dir. Returns False (no-op) if the SNAPSHOT_GITHUB_*
+    env vars aren't all set. Any download/parse failure is logged and
+    returns False rather than raising — a boot-time fetch failure should
+    fall back to starting empty, not crash the app for every visitor.
+    """
+    config = _snapshot_release_config()
+    if config is None:
+        return False
+
+    try:
+        release = json.loads(_github_api_get(
+            f"https://api.github.com/repos/{config['repo']}/releases/{config['release_id']}",
+            config["token"], "application/vnd.github+json",
+        ))
+        asset = next(
+            (a for a in release.get("assets", []) if a["name"] == config["asset"]), None
+        )
+        if asset is None:
+            raise RuntimeError(
+                f"Asset {config['asset']!r} not found in release {config['release_id']!r}"
+            )
+        zip_bytes = _github_api_get(asset["url"], config["token"], "application/octet-stream")
+    except (HTTPError, URLError, RuntimeError, KeyError, json.JSONDecodeError) as exc:
+        print(f"VectorStore: snapshot download from GitHub release failed: {exc}")
+        return False
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        zf.extractall(dest_dir)
+    print(f"VectorStore: snapshot downloaded from {config['repo']} release "
+          f"{config['release_id']} → {dest_dir}")
+    return True
 
 
 class VectorStore:
@@ -84,8 +165,10 @@ class VectorStore:
     def _init_client(self) -> chromadb.ClientAPI:
         """
         Initialize ChromaDB client.
-        If the persist dir doesn't exist but a snapshot does, restore it first.
-        This handles the Streamlit Cloud ephemeral filesystem scenario.
+        If the persist dir doesn't exist but a snapshot does, restore it
+        first. If neither exists, try pulling the snapshot from a private
+        GitHub release (C13) before giving up — this is what makes a fresh
+        Streamlit Cloud checkout usable without re-ingestion.
         """
         if self.demo_mode:
             # In-memory client for CI / demo mode (no filesystem needed)
@@ -93,6 +176,9 @@ class VectorStore:
             return chromadb.Client()
 
         if not self.persist_dir.exists():
+            if not self.snapshot_path.exists():
+                fetch_snapshot_from_github_release(self.snapshot_path)
+
             if self.snapshot_path.exists():
                 print(f"VectorStore: persist dir missing, restoring from snapshot...")
                 self._restore_from_snapshot()
