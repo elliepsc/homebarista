@@ -10,17 +10,17 @@ an empty knowledge base.
 
 THE SOLUTION — two-mode architecture:
 1. LOCAL / CI mode: ChromaDB in persist mode (fast, normal dev workflow)
-2. DEPLOYED mode: ChromaDB loaded from a pre-built snapshot committed to git.
-
-The snapshot is a single SQLite file (data/chroma_snapshot.db) exported
-from ChromaDB's underlying DuckDB/SQLite engine.
+2. DEPLOYED mode: ChromaDB loaded from a pre-built snapshot kept OUT of git
+   (G4: the snapshot embeds full YouTube transcript text — a copyright
+   concern — so it is exported locally and copied to private storage,
+   never committed; data/chroma_snapshot/ is gitignored).
 
 HOW IT WORKS:
 - After ingestion locally: run `python -m pipeline.vector_store --export`
-  → writes data/chroma_snapshot.db (typically 20-80 MB for 300+ docs)
-- Commit data/chroma_snapshot.db to git (remove from .gitignore)
+  → writes data/chroma_snapshot/ (a persisted ChromaDB directory)
+- Copy data/chroma_snapshot/ to private storage (never git) for deploy
 - On Streamlit Cloud startup: vector_store detects missing chroma_db/,
-  restores from snapshot into a temp directory
+  restores from the snapshot into a temp directory
 - App works immediately without re-ingestion
 
 ALTERNATIVE (if snapshot too large for git):
@@ -123,8 +123,9 @@ class VectorStore:
 
     def export_snapshot(self) -> None:
         """
-        Export the current ChromaDB to a snapshot directory for git commit.
-        Run this after ingestion to prepare for Streamlit Cloud deployment.
+        Export the current ChromaDB to a snapshot directory (gitignored,
+        G4 — never committed). Run this after ingestion, then copy the
+        directory to private storage to prepare for Streamlit Cloud deployment.
 
         Usage: python -m pipeline.vector_store --export
         """
