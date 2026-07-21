@@ -45,7 +45,7 @@ from typing import Optional
 DEFAULT_PROVIDER = "groq"
 
 DEFAULT_MODELS = {
-    "groq": "llama-3.3-70b-versatile",
+    "groq": "openai/gpt-oss-120b",
     "anthropic": "claude-haiku-4-5",
     "openai": "gpt-4o-mini",
 }

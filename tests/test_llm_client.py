@@ -33,6 +33,13 @@ def test_default_provider_is_groq(monkeypatch):
     assert client.model == DEFAULT_MODELS["groq"]
 
 
+def test_groq_default_model_is_gpt_oss(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    client = LLMClient()
+    assert client.model == "openai/gpt-oss-120b"
+
+
 def test_env_overrides_provider_and_model(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "anthropic")
     monkeypatch.setenv("LLM_MODEL", "claude-sonnet-5")
