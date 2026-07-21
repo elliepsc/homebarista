@@ -117,6 +117,7 @@ def judge_style(coachings: list[str]) -> dict:
         response = client.create(
             messages=[{"role": "user", "content": JUDGE_PROMPT.format(coaching=text[:3000])}],
             max_tokens=300,
+            reasoning_effort="low",
         )
         scores = extract_json(response.text)
         try:

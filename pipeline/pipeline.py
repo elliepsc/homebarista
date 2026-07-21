@@ -356,6 +356,7 @@ RULES: Give specific measurements. Explain WHY. End with a validation test.
             "Always include measurements, explain the root cause, end with a validation test."
         ),
         max_tokens=1200,
+        reasoning_effort="low",
     )
     return response.text
 
