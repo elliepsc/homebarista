@@ -1,0 +1,50 @@
+{
+  "dataset": "data/eval_dataset_coaching.json",
+  "n_queries": 32,
+  "per_style": {
+    "detailed": {
+      "pass_rate": 0.032,
+      "mean_score": 0.662,
+      "failed_checks": {
+        "appropriate_length": 18,
+        "has_validation_test": 15,
+        "explains_root_cause": 17,
+        "mentions_root_cause": 11,
+        "specific_enough": 2
+      },
+      "errors": 1
+    },
+    "concise": {
+      "pass_rate": 0.097,
+      "mean_score": 0.7,
+      "failed_checks": {
+        "appropriate_length": 13,
+        "has_validation_test": 6,
+        "explains_root_cause": 22,
+        "mentions_root_cause": 12,
+        "specific_enough": 3
+      },
+      "errors": 1
+    },
+    "technical": {
+      "pass_rate": 0.097,
+      "mean_score": 0.657,
+      "failed_checks": {
+        "appropriate_length": 19,
+        "has_validation_test": 11,
+        "explains_root_cause": 18,
+        "mentions_root_cause": 12,
+        "specific_enough": 4
+      },
+      "errors": 1
+    }
+  },
+  "llm_judge": null,
+  "winner": "concise",
+  "bias_note": "LLM judge uses the same configured model as the generator. Scores may be inflated.",
+  "thresholds": {
+    "pass_rate": 0.7,
+    "mean_score": 0.65
+  },
+  "verdict": "FAIL"
+}

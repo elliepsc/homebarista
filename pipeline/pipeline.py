@@ -314,6 +314,29 @@ async def _run_linear(
     }
 
 
+# Per-style word targets, all inside CoachingEvaluator's [120, 700] window
+# (MIN/MAX_COACHING_WORDS) with margin. Without an explicit target, the 3
+# styles were only differentiated by the single word "STYLE: {style}" in
+# the prompt — the model's output length landed inside/outside the eval
+# window essentially at random, which drove ~60% of "appropriate_length"
+# failures on the 2026-07-21 live run (C10 post-fix) regardless of style.
+STYLE_GUIDANCE = {
+    "detailed": (
+        "Write a thorough, step-by-step explanation, roughly 400-600 words. "
+        "Cover the science behind the root cause, walk through each "
+        "adjustment one at a time, and anticipate a likely follow-up question."
+    ),
+    "concise": (
+        "Be brief and to the point, roughly 150-250 words. Give only the "
+        "essential fix and the single most important reason why — no filler."
+    ),
+    "technical": (
+        "Use precise technical language, roughly 300-450 words: extraction "
+        "chemistry, exact parameter deltas, and the mechanism behind the fix."
+    ),
+}
+
+
 def _generate_coaching_linear(
     context: BrewingContext,
     diagnostic,
@@ -333,6 +356,10 @@ def _generate_coaching_linear(
         f"[{c.get('channel', '')} — {c.get('title', '')}]\n{c.get('text', '')[:400]}"
         for c in chunks[:3]
     )
+    root_cause_name = (
+        diagnostic.root_causes[0].hypothesis.replace("_", " ").replace("-", " ")
+        if diagnostic.root_causes else "the underlying cause"
+    )
 
     prompt = f"""Generate a barista coaching response.
 
@@ -345,15 +372,21 @@ ACTION PLAN:
 EXPERT KNOWLEDGE:
 {chunks_text or 'Use general expertise.'}
 
-STYLE: {style}
-RULES: Give specific measurements. Explain WHY. End with a validation test.
+STYLE: {style} — {STYLE_GUIDANCE[style]}
+RULES:
+- Give specific measurements (grams, seconds, degrees Celsius, grind notches).
+- Name the root cause explicitly and early, using the phrase "{root_cause_name}" naturally in a sentence.
+- Explain WHY the fix works with a clear "because"/"due to" statement.
+- End with an explicit validation test starting with a phrase like "You should notice...",
+  "You should taste...", "Test by...", or "Verify by...", so the user knows how to confirm the fix worked.
 """
 
     response = client.create(
         messages=[{"role": "user", "content": prompt}],
         system=(
             "You are HomeBarista Coach. Generate specific, science-backed barista coaching. "
-            "Always include measurements, explain the root cause, end with a validation test."
+            "Always include measurements, name and explain the root cause, end with a validation test. "
+            "Follow the style's word-count target closely."
         ),
         max_tokens=1200,
         reasoning_effort="low",
