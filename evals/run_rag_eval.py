@@ -17,10 +17,21 @@ default. BIAS NOTE: the judge is the same model as the generator —
 scores may be inflated; treat them as relative, not absolute.
 
 Usage:
-  python -m evals.run_rag_eval               # structural, 3 styles x N queries
-  python -m evals.run_rag_eval --llm-judge   # + LLM judge (extra API calls)
+  python -m evals.run_rag_eval --build-dataset  # offline, no API calls, run once first
+  python -m evals.run_rag_eval                  # structural, 3 styles x N queries
+  python -m evals.run_rag_eval --llm-judge      # + LLM judge (extra API calls)
 Cost: ~150 LLM calls (~1200 tokens out each) — free on the Groq free tier,
 a few cents on paid providers. Never in CI.
+
+C10: data/eval_dataset.json was generated for the RETRIEVAL eval and
+includes factual/how-to queries with no symptom (origin, technique...).
+The linear pipeline's deterministic guard correctly rejects those with
+"Could not diagnose" — that's a dataset/eval-scope mismatch, not a
+generation-quality signal, and it was inflating the error count on the
+2026-07-20 pilot run. --build-dataset filters down to symptom-bearing
+queries only (data/eval_dataset_coaching.json) by replaying the exact same
+guard offline via SymptomExtractor(demo_mode=True) + DiagnosticPlanner —
+no LLM call, safe to run anytime, deterministic.
 """
 
 import argparse
@@ -32,6 +43,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DATASET = Path("data/eval_dataset.json")
+COACHING_DATASET = Path("data/eval_dataset_coaching.json")
 RESULTS_DIR = Path("evals/results")
 
 STYLES = ["detailed", "concise", "technical"]
@@ -53,6 +65,43 @@ Respond in JSON: {{"specificity": n, "science": n, "actionability": n,
 
 COACHING TO RATE:
 {coaching}"""
+
+
+# ------------------------------------------------------------------
+# Dataset filtering (C10) — offline, no LLM call
+# ------------------------------------------------------------------
+
+def build_coaching_dataset() -> None:
+    """
+    Filter the retrieval dataset down to symptom-bearing queries only, by
+    replaying pipeline.py's Step 3 guard (diagnostic_confidence < 0.15 and
+    goal == "troubleshoot" → "Could not diagnose") entirely offline. Writes
+    COACHING_DATASET. See the module docstring (C10) for why this exists.
+    """
+    from engine.diagnostic_planner import DiagnosticPlanner
+    from engine.symptom_extractor import SymptomExtractor
+
+    if not DATASET.exists():
+        raise SystemExit(
+            f"{DATASET} not found. Generate it first: "
+            "python -m evals.run_retrieval_eval --generate"
+        )
+
+    dataset = json.loads(DATASET.read_text(encoding="utf-8"))
+    extractor = SymptomExtractor(demo_mode=True)
+    planner = DiagnosticPlanner()
+
+    kept = []
+    for item in dataset:
+        context = extractor.extract(item["synthetic_query"])
+        diagnostic = planner.diagnose(context)
+        blocked = diagnostic.diagnostic_confidence < 0.15 and context.goal == "troubleshoot"
+        if not blocked:
+            kept.append(item)
+
+    COACHING_DATASET.write_text(json.dumps(kept, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"{len(kept)}/{len(dataset)} queries kept (symptom-bearing) → {COACHING_DATASET}")
+    print(f"{len(dataset) - len(kept)} filtered out — would hit 'Could not diagnose' (factual/no-symptom).")
 
 
 # ------------------------------------------------------------------
@@ -139,12 +188,12 @@ def judge_style(coachings: list[str]) -> dict:
 # ------------------------------------------------------------------
 
 def main(llm_judge: bool) -> None:
-    if not DATASET.exists():
+    if not COACHING_DATASET.exists():
         raise SystemExit(
-            f"{DATASET} not found. Generate it first: "
-            "python -m evals.run_retrieval_eval --generate"
+            f"{COACHING_DATASET} not found. Build it first (offline, no API calls): "
+            "python -m evals.run_rag_eval --build-dataset"
         )
-    dataset = json.loads(DATASET.read_text(encoding="utf-8"))
+    dataset = json.loads(COACHING_DATASET.read_text(encoding="utf-8"))
     print(f"RAG eval on {len(dataset)} queries × {len(STYLES)} styles (live, linear mode)")
 
     per_style, coachings_by_style = {}, {}
@@ -170,7 +219,7 @@ def main(llm_judge: bool) -> None:
     )
 
     output = {
-        "dataset": str(DATASET),
+        "dataset": str(COACHING_DATASET),
         "n_queries": len(dataset),
         "per_style": per_style,
         "llm_judge": judge_results,
@@ -201,6 +250,11 @@ if __name__ == "__main__":
     load_dotenv()  # LLM_* config from .env (see .env.example)
 
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build-dataset", action="store_true",
+                         help="filter to symptom-bearing queries only (offline, no API calls), then exit")
     parser.add_argument("--llm-judge", action="store_true", help="also run the LLM judge (extra API calls)")
     args = parser.parse_args()
-    main(llm_judge=args.llm_judge)
+    if args.build_dataset:
+        build_coaching_dataset()
+    else:
+        main(llm_judge=args.llm_judge)
