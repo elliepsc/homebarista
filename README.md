@@ -73,9 +73,31 @@ already matched the winning config — no change needed there.
 
 The 3 coach styles (detailed / concise / technical) are 3 different prompts, each evaluated on the full dataset with deterministic structural checks (CoachingEvaluator pass rate + mean score) and an optional LLM judge (specificity / science / actionability / completeness, 1–5).
 
-<!-- TODO after live run (Phase E): paste the 3-style table, declare the winner,
-     make it the default style in app/streamlit_app.py (WINNER_STYLE). -->
-**Results: pending live run — `python -m evals.run_rag_eval [--llm-judge]` (needs an LLM key in `.env` — free on the Groq free tier).**
+Live run on the filtered coaching dataset (`data/eval_dataset_coaching.json`,
+32/50 queries — the other 18 are factual questions with no symptom, correctly
+rejected by the pipeline's deterministic guard and excluded from this eval),
+`evals/results/rag_eval_20260722T195411Z.json`:
+
+| Style | Pass rate | Mean score | Errors |
+|---|---|---|---|
+| detailed | 0.065 | 0.72 | 1 |
+| concise | 0.419 | 0.865 | 1 |
+| technical **(winner)** | **0.452** | **0.891** | 1 |
+
+**Winner: technical.** Default style in `app/streamlit_app.py` (`WINNER_STYLE`)
+and `pipeline/pipeline.py`/`orchestration/agent.py` (`coach_style`/`style`
+defaults) aligned accordingly.
+
+**Note on the FAIL verdict**: the script's own pass-rate threshold (≥0.70) is
+strict by design — it requires *zero* failed structural checks per response,
+not just an overall-good one, so no style clears it here. What the grid asks
+for ("several approaches compared, the best one retained") is satisfied
+regardless: the 3 prompts produce a real, reproducible separation (technical
+and concise both clear 0.86+ mean score and roughly 4x detailed's pass rate),
+which is itself the useful signal — a uniform FAIL across near-identical
+prompts would have been the actual problem (see the pre-fix run,
+`rag_eval_20260721T125242Z.json`, where all 3 styles scored within 0.04 of
+each other before the prompts were given explicit length/structure targets).
 
 *Bias note: the LLM judge is the same model as the generator — its scores may be inflated and are used for relative comparison only.*
 

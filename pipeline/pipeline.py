@@ -146,7 +146,7 @@ def _get_components(
 
 async def run_pipeline(
     raw_problem: str,
-    coach_style: Literal["detailed", "concise", "technical"] = "detailed",
+    coach_style: Literal["detailed", "concise", "technical"] = "technical",
     demo_mode: bool = True,
     use_agent: bool = True,
     conversation_history: Optional[list[dict]] = None,

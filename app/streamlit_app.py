@@ -35,9 +35,9 @@ load_dotenv()  # LLM_*, DEMO_MODE, CHROMA_PERSIST_DIR from .env (see .env.exampl
 from engine.llm_client import DEFAULT_MODELS, get_provider
 from pipeline.pipeline import run_pipeline
 
-# Default style — winner of the Phase E RAG evaluation (update after the
-# live eval run: see evals/run_rag_eval.py).
-WINNER_STYLE = "detailed"
+# Default style — winner of the Phase E RAG evaluation (evals/run_rag_eval.py,
+# rag_eval_20260722T195411Z.json): technical, pass_rate 0.452 / mean 0.891.
+WINNER_STYLE = "technical"
 STYLES = ["detailed", "concise", "technical"]
 FEEDBACK_FILE = Path("logs/feedback.jsonl")
 

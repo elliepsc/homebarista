@@ -143,8 +143,8 @@ TOOLS = [
                 "style": {
                     "type": "string",
                     "enum": ["detailed", "concise", "technical"],
-                    "description": "Coaching style. Default: 'detailed'.",
-                    "default": "detailed",
+                    "description": "Coaching style. Default: 'technical'.",
+                    "default": "technical",
                 },
             },
             "required": [],
@@ -304,7 +304,7 @@ IMPORTANT RULES:
     def run(
         self,
         user_message: str,
-        style: str = "detailed",
+        style: str = "technical",
         conversation_history: Optional[list[dict]] = None,
     ) -> dict:
         """
