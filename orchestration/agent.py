@@ -361,6 +361,7 @@ IMPORTANT RULES:
                 system=self.SYSTEM_PROMPT,
                 max_tokens=2048,
                 tools=TOOLS,
+                reasoning_effort="low",
             )
 
             # Log the agent's reasoning turn
@@ -522,6 +523,7 @@ IMPORTANT RULES:
                 "Match the requested style. End with a validation test."
             ),
             max_tokens=1200,
+            reasoning_effort="low",
         )
 
         self._coaching_text = inner_response.text
@@ -622,6 +624,7 @@ IMPORTANT RULES:
             messages=[{"role": "user", "content": prompt}],
             system=system,
             max_tokens=800,
+            reasoning_effort="low",
         )
 
         answer = preamble + response.text
