@@ -69,6 +69,8 @@ already matched the winning config — no change needed there.
 - **C2 vs C4 is the query-rewriting evidence**: the Retriever rewrites the raw user message into a diagnostic-aware query (machine + symptom + root-cause hypothesis) via `_build_query`; the agent can also rewrite queries via `query_override`. On the live corpus, rewriting *hurts* retrieval — it abstracts away the specific vocabulary present in the transcript chunks.
 - **C2 vs C3 is the hybrid-search evidence**: BM25 keyword search fused with vector search via Reciprocal Rank Fusion (k=60) before cross-encoder re-ranking. Hybrid helps a little over vector-only, but not nearly as much as dropping the query rewrite.
 
+**Control re-run on the final corpus** (`evals/results/retrieval_20260723T074731Z.json`, same 50-query dataset, now 725 chunks / 95 sources / 5 channels instead of 55/24/2): absolute scores drop for every config as expected with ~13x more distractor chunks (C4 hit_rate@5 0.86 → 0.72), but the ranking is unchanged and C4_raw_query_ce still wins by a wide margin (next best: C3 at 0.12) — the 07-17 table above stands.
+
 ### RAG / LLM — 3 prompts compared (`evals/run_rag_eval.py`)
 
 The 3 coach styles (detailed / concise / technical) are 3 different prompts, each evaluated on the full dataset with deterministic structural checks (CoachingEvaluator pass rate + mean score) and an optional LLM judge (specificity / science / actionability / completeness, 1–5).

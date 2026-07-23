@@ -1,0 +1,34 @@
+{
+  "dataset": "data/eval_dataset.json",
+  "n_queries": 50,
+  "mode": "live",
+  "configs": {
+    "C1_vector_only": {
+      "hit_rate_5": 0.06,
+      "hit_rate_10": 0.06,
+      "mrr": 0.045
+    },
+    "C2_vector_ce": {
+      "hit_rate_5": 0.06,
+      "hit_rate_10": 0.06,
+      "mrr": 0.032
+    },
+    "C3_hybrid_ce": {
+      "hit_rate_5": 0.12,
+      "hit_rate_10": 0.16,
+      "mrr": 0.055
+    },
+    "C4_raw_query_ce": {
+      "hit_rate_5": 0.72,
+      "hit_rate_10": 0.74,
+      "mrr": 0.674
+    }
+  },
+  "winner": "C4_raw_query_ce",
+  "thresholds": {
+    "hit_rate_5": 0.55,
+    "mrr": 0.45
+  },
+  "verdict": "PASS",
+  "notes": "C2 (rewritten diagnostic-aware query) vs C4 (raw user query) is the query-rewriting comparison. C3 vs C2 is the hybrid-search comparison. Precision@k dropped: single relevant chunk per query caps it at 1/k."
+}
