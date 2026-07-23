@@ -40,7 +40,7 @@ import zipfile
 from pathlib import Path
 from typing import Optional
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request, HTTPRedirectHandler, build_opener
 
 import chromadb
 from chromadb.config import Settings
@@ -78,13 +78,32 @@ def _snapshot_release_config() -> Optional[dict]:
     }
 
 
+class _AuthStrippingRedirectHandler(HTTPRedirectHandler):
+    """
+    The release-asset download endpoint 302s to a signed blob-storage URL
+    (Accept: application/octet-stream). urllib's default redirect handling
+    forwards the original request's headers verbatim, including our PAT's
+    Authorization header — sent to a presigned URL, that collides with its
+    own query-string auth and the storage backend rejects it (400). Strip
+    Authorization on redirect; the signed URL doesn't need it.
+    """
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new_req = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new_req is not None:
+            new_req.remove_header("Authorization")
+        return new_req
+
+
+_opener = build_opener(_AuthStrippingRedirectHandler)
+
+
 def _github_api_get(url: str, token: str, accept: str) -> bytes:
     request = Request(url, headers={
         "Authorization": f"Bearer {token}",
         "Accept": accept,
         "X-GitHub-Api-Version": "2022-11-28",
     })
-    with urlopen(request, timeout=30) as response:
+    with _opener.open(request, timeout=30) as response:
         return response.read()
 
 

@@ -4,6 +4,7 @@ import io
 import json
 import zipfile
 from unittest.mock import MagicMock, patch
+from urllib.request import Request
 
 from pipeline.vector_store import fetch_snapshot_from_github_release
 
@@ -45,14 +46,15 @@ def test_downloads_and_extracts_asset(tmp_path, monkeypatch):
     zip_payload = _zip_bytes({"chroma.sqlite3": b"fake-db-bytes"})
 
     responses = [_fake_response(release_json), _fake_response(zip_payload)]
-    with patch("pipeline.vector_store.urlopen", side_effect=responses) as mock_urlopen:
+    with patch("pipeline.vector_store._opener") as mock_opener:
+        mock_opener.open.side_effect = responses
         dest = tmp_path / "snapshot"
         result = fetch_snapshot_from_github_release(dest)
 
     assert result is True
     assert (dest / "chroma.sqlite3").read_bytes() == b"fake-db-bytes"
-    assert mock_urlopen.call_count == 2
-    first_request = mock_urlopen.call_args_list[0].args[0]
+    assert mock_opener.open.call_count == 2
+    first_request = mock_opener.open.call_args_list[0].args[0]
     assert first_request.headers["Authorization"] == "Bearer tok"
 
 
@@ -62,7 +64,8 @@ def test_missing_asset_returns_false(tmp_path, monkeypatch):
     monkeypatch.setenv("SNAPSHOT_GITHUB_RELEASE_ID", "42")
 
     release_json = json.dumps({"assets": []}).encode()
-    with patch("pipeline.vector_store.urlopen", return_value=_fake_response(release_json)):
+    with patch("pipeline.vector_store._opener") as mock_opener:
+        mock_opener.open.return_value = _fake_response(release_json)
         result = fetch_snapshot_from_github_release(tmp_path / "snapshot")
 
     assert result is False
@@ -76,7 +79,29 @@ def test_network_error_returns_false(tmp_path, monkeypatch):
 
     from urllib.error import URLError
 
-    with patch("pipeline.vector_store.urlopen", side_effect=URLError("no network")):
+    with patch("pipeline.vector_store._opener") as mock_opener:
+        mock_opener.open.side_effect = URLError("no network")
         result = fetch_snapshot_from_github_release(tmp_path / "snapshot")
 
     assert result is False
+
+
+def test_redirect_strips_authorization_header():
+    """The release-asset endpoint 302s to a signed blob-storage URL; the
+    original request's Authorization header must NOT be forwarded there
+    (the storage backend rejects a request carrying both its own
+    query-string auth and an extra Authorization header)."""
+    from pipeline.vector_store import _AuthStrippingRedirectHandler
+
+    handler = _AuthStrippingRedirectHandler()
+    req = Request(
+        "https://api.github.com/repos/elliepsc/homebarista/releases/assets/1",
+        headers={"Authorization": "Bearer tok", "Accept": "application/octet-stream"},
+    )
+    new_req = handler.redirect_request(
+        req, fp=None, code=302, msg="Found", headers={},
+        newurl="https://signed-blob-storage.example.com/asset?sig=abc",
+    )
+
+    assert new_req is not None
+    assert "Authorization" not in new_req.headers
