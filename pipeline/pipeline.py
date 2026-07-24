@@ -73,14 +73,18 @@ def _get_components(
     use_cross_encoder: bool = True,
     api_key: Optional[str] = None,
 ):
-    """Lazy-initialise all components. Reuse across requests."""
+    """Lazy-initialise all components. Reuse across requests.
+
+    Demo mode deliberately builds NOTHING from the ML stack (torch,
+    transformers, sentence-transformers, chromadb): a demo request never
+    retrieves (it uses _mock_chunks) and never calls the agent, so importing
+    those would only add cold-start latency and memory pressure — enough to
+    OOM the app on Streamlit Cloud's small free tier. Keeping demo purely
+    deterministic (ScopeGuard + regex extractor + planner + mock coaching)
+    is what makes demo mode reliable even when live mode is under load.
+    """
     global _embedder, _store, _retriever, _extractor, _planner, _evaluator
     global _agent, _llm_api_key, _components_demo
-
-    from ingestion.embedder import Embedder
-    from orchestration.agent import HomeBaristaAgent
-    from pipeline.retriever import Retriever
-    from pipeline.vector_store import VectorStore
 
     # Mode-dependent singletons must not survive a demo↔live switch:
     # a store built in demo mode is in-memory and EMPTY — reusing it in
@@ -100,41 +104,55 @@ def _get_components(
         _agent = None
         _llm_api_key = api_key
 
+    # Deterministic components — pure Python, no ML imports, always needed.
+    if _planner is None:
+        _planner = DiagnosticPlanner()
+    if _evaluator is None:
+        _evaluator = CoachingEvaluator()
+
+    # --------------------------------------------------------------
+    # DEMO MODE — no ML stack. retriever/agent stay None (unused).
+    # --------------------------------------------------------------
+    if demo_mode:
+        if _extractor is None:
+            _extractor = SymptomExtractor(llm_client=None, demo_mode=True)
+        return _extractor, _planner, _retriever, _evaluator, _agent
+
+    # --------------------------------------------------------------
+    # LIVE MODE — heavy imports happen here, lazily, only when needed.
+    # --------------------------------------------------------------
+    from ingestion.embedder import Embedder
+    from orchestration.agent import HomeBaristaAgent
+    from pipeline.retriever import Retriever
+    from pipeline.vector_store import VectorStore
+    from engine.llm_client import LLMClient
+
     if _embedder is None:
         _embedder = Embedder()
 
     if _store is None:
-        _store = VectorStore(demo_mode=demo_mode)
+        _store = VectorStore(demo_mode=False)
 
     if _retriever is None:
         _retriever = Retriever(
             _embedder,
             _store,
-            use_cross_encoder=use_cross_encoder and not demo_mode,
+            use_cross_encoder=use_cross_encoder,
         )
 
     if _extractor is None:
-        llm_client = None
-        if not demo_mode:
-            from engine.llm_client import LLMClient
-            llm_client = LLMClient(api_key=api_key)
-        _extractor = SymptomExtractor(llm_client=llm_client, demo_mode=demo_mode)
+        _extractor = SymptomExtractor(
+            llm_client=LLMClient(api_key=api_key), demo_mode=False
+        )
 
-    if _planner is None:
-        _planner = DiagnosticPlanner()
-
-    if _evaluator is None:
-        _evaluator = CoachingEvaluator()
-
-    if _agent is None and not demo_mode:
-        from engine.llm_client import LLMClient
+    if _agent is None:
         _agent = HomeBaristaAgent(
             symptom_extractor=_extractor,
             diagnostic_planner=_planner,
             retriever=_retriever,
             coaching_evaluator=_evaluator,
             llm_client=LLMClient(api_key=api_key),
-            demo_mode=demo_mode,
+            demo_mode=False,
         )
 
     return _extractor, _planner, _retriever, _evaluator, _agent
@@ -223,7 +241,20 @@ async def run_pipeline(
     except ValueError as e:
         # ValueError carries user-facing guidance (too vague, blocked, ...)
         return _error_result(session_id, str(e))
-    except Exception:
+    except Exception as e:
+        # A 429 that outlived the client's retries means the free-tier
+        # token/minute budget is momentarily exhausted (e.g. several visitors
+        # sharing the key). That's not a server fault — tell the user plainly
+        # how to proceed instead of a scary generic error.
+        from engine.llm_client import _is_rate_limit_error
+        if _is_rate_limit_error(e):
+            logger.warning(f"Session {session_id} hit provider rate limit")
+            return _error_result(
+                session_id,
+                "The free coaching budget is busy right now (shared rate "
+                "limit). Please wait about a minute and try again — or unlock "
+                "Live mode with your own API key for unlimited use.",
+            )
         # Never surface internals (paths, config, provider errors) to the UI.
         logger.exception(f"Session {session_id} failed")
         return _error_result(

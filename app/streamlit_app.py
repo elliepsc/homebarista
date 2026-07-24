@@ -223,11 +223,15 @@ if user_input:
 
     with st.chat_message("assistant"):
         with st.spinner("Diagnosing your coffee problem..."):
+            # Agent mode (~4 LLM calls/run) only for visitors on their OWN
+            # key — their budget, their cost. The shared free key runs the
+            # linear pipeline (1 LLM call/run) so a single request can't
+            # swallow the whole free-tier token/minute budget and 429.
             result = asyncio.run(run_pipeline(
                 user_input,
                 coach_style=style,
                 demo_mode=demo,
-                use_agent=not demo,
+                use_agent=not demo and using_byo_key,
                 conversation_history=st.session_state["messages"],
                 api_key=st.session_state["byo_api_key"],
             ))
