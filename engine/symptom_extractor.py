@@ -64,6 +64,11 @@ SYMPTOM_KEYWORDS: dict[str, list[str]] = {
     "thin_crema": [
         "thin crema", "crème fine", "no crema", "pas de crème", "crema absente",
         "pale crema", "crema disparaît", "crema disappears",
+        # "more/better crema" = the user's crema is currently insufficient;
+        # treat it as the thin_crema symptom so it diagnoses instead of
+        # falling through to a symptomless, un-diagnosable troubleshoot.
+        "more crema", "extra crema", "increase crema", "better crema",
+        "plus de crème", "meilleure crème",
     ],
     "channeling": [
         "channeling", "channelling", "uneven extraction", "extraction inégale",
