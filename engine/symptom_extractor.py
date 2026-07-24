@@ -147,6 +147,16 @@ PURCHASE_SIGNALS = [
     "buy a grinder", "which grinder", "recommend a grinder", "espresso machine recommendation",
 ]
 
+# Bean / coffee selection questions ("how to choose coffee", "which beans")
+# — informational, not a taste problem. Route to goal="general".
+SELECTION_SIGNALS = [
+    "how to choose", "how do i choose", "comment choisir", "which coffee",
+    "which bean", "which roast", "quel café", "quel grain", "quelle mouture",
+    "what coffee should", "what beans should", "recommend a coffee",
+    "recommend beans", "best coffee bean", "how to pick a coffee",
+    "choosing beans", "choosing a coffee",
+]
+
 # Pure coffee science / theory questions — LLM answers from training knowledge
 SCIENCE_SIGNALS = [
     "what is tds", "what is extraction yield", "what is bloom", "what is bypass",
@@ -358,6 +368,8 @@ class SymptomExtractor:
         if ERROR_CODE_RE.search(lower):
             return "general"
         if any(s in lower for s in PURCHASE_SIGNALS):
+            return "general"
+        if any(s in lower for s in SELECTION_SIGNALS):
             return "general"
         if any(s in lower for s in SCIENCE_SIGNALS):
             return "general"

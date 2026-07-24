@@ -292,12 +292,25 @@ async def _run_linear(
     # Step 2 — Diagnose
     diagnostic = planner.diagnose(context)
 
-    # Step 3 — Guard: too vague?
-    if diagnostic.diagnostic_confidence < 0.15 and context.goal == "troubleshoot":
-        raise ValueError(
-            "Could not diagnose the problem. Please describe: "
-            "your machine, what tastes wrong (bitter/sour/weak), and any parameters you know."
-        )
+    # Step 3 — Route by what kind of coffee question this is.
+    # The linear diagnostic pipeline only handles TASTE problems (a detected
+    # symptom + enough confidence). Anything else is a legitimate coffee
+    # question the diagnostic engine can't answer — never a hard error.
+    diagnosable = bool(diagnostic.symptoms) and diagnostic.diagnostic_confidence >= 0.15
+    if not diagnosable:
+        if context.goal == "troubleshoot":
+            # A taste complaint too vague to diagnose — ask for specifics.
+            raise ValueError(
+                "Could not diagnose the problem. Please describe: your machine, "
+                "what tastes wrong (bitter/sour/weak), and any parameters you know."
+            )
+        # A general/informational coffee question (choosing beans, recipes,
+        # theory, buying advice). Demo has no LLM → point to Live; Live
+        # answers it directly with one LLM call.
+        if demo_mode:
+            return _info_result(session_id, _demo_general_text(), context)
+        answer = _answer_general_linear(raw_problem, context, api_key=api_key)
+        return _info_result(session_id, answer, context)
 
     # Step 4 — Retrieve
     # query_override=raw_problem: the retrieval eval (README §3) found the raw
@@ -423,6 +436,63 @@ RULES:
         reasoning_effort="low",
     )
     return response.text
+
+
+def _answer_general_linear(
+    raw_problem: str, context: BrewingContext, api_key: Optional[str] = None
+) -> str:
+    """Answer a general (non-troubleshoot) coffee question with one LLM call.
+    Used by the linear path (shared-key Live mode) for questions the taste-
+    diagnostic pipeline can't handle: choosing beans, recipes, theory, buying.
+    Scope-disciplined so it never gets pulled off coffee (see ScopeGuard)."""
+    from engine.llm_client import LLMClient
+
+    machine = ""
+    if context.machine_type and context.machine_type != "unknown":
+        machine = f" (their machine: {context.machine_type})"
+    response = LLMClient(api_key=api_key).create(
+        messages=[{"role": "user",
+                   "content": f"Coffee question{machine}: {raw_problem}"}],
+        system=(
+            "You are HomeBarista Coach, an expert barista. Answer ONLY the "
+            "coffee-related part of the question, accurately and practically. "
+            "If any part is not about coffee, do not answer that part — briefly "
+            "say you only help with coffee. Be specific and concise."
+        ),
+        max_tokens=700,
+        reasoning_effort="low",
+    )
+    return response.text
+
+
+def _demo_general_text() -> str:
+    """Demo has no LLM, so it can't answer open coffee questions — point the
+    user to Live mode instead of erroring."""
+    return (
+        "[DEMO MODE] That's a great coffee question — but demo mode only runs "
+        "the deterministic **diagnostic engine**, which handles taste problems "
+        "(bitter, sour, weak, thin crema...). For open questions like choosing "
+        "beans, recipes, or brewing theory, switch to **Live (real AI "
+        "coaching)** in the sidebar for a full AI-powered answer."
+    )
+
+
+def _info_result(session_id: str, text: str, context: BrewingContext) -> dict:
+    """Standard result envelope for a non-diagnostic answer (general question
+    or demo redirect) — status 'coaching' so it renders as a normal reply."""
+    from dataclasses import asdict
+    return {
+        "status": "coaching",
+        "coaching_text": text,
+        "clarification_question": "",
+        "context": asdict(context),
+        "diagnostic": {},
+        "retrieved_chunks": [],
+        "evaluation": {},
+        "session_id": session_id,
+        "tool_call_log": [],
+        "iterations": 1,
+    }
 
 
 def _demo_coaching(context: BrewingContext, diagnostic) -> str:
