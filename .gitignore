@@ -45,6 +45,7 @@ ingestion/progress.json
 
 # Local notes and scratch docs
 docs-notes/
+streamlit_secrets.md
 
 # Notebook checkpoints
 .ipynb_checkpoints/
