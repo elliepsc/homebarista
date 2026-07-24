@@ -41,6 +41,29 @@ WINNER_STYLE = "technical"
 STYLES = ["detailed", "concise", "technical"]
 FEEDBACK_FILE = Path("logs/feedback.jsonl")
 
+
+def _build_marker() -> str:
+    """Short git SHA of the running checkout, read straight from .git (no git
+    binary needed). Lets anyone see WHICH commit is live — compare it to the
+    latest push to confirm a redeploy actually landed. Falls back to 'local'."""
+    try:
+        head = Path(".git/HEAD").read_text(encoding="utf-8").strip()
+        if head.startswith("ref:"):
+            ref = head[4:].strip()
+            loose = Path(".git") / ref
+            if loose.exists():
+                return loose.read_text(encoding="utf-8").strip()[:7]
+            packed = Path(".git/packed-refs")
+            if packed.exists():
+                for line in packed.read_text(encoding="utf-8").splitlines():
+                    if line.endswith(ref):
+                        return line.split()[0][:7]
+        else:
+            return head[:7]
+    except Exception:
+        pass
+    return "local"
+
 # Live-mode budgets. Two unlock paths, two different cost owners:
 # - BYO key (visitor's own): their cost, not capped here.
 # - Shared password (owner's key): capped per session AND by a global
@@ -189,6 +212,9 @@ with st.sidebar:
             "cost 0 tokens\n"
             "- [Source on GitHub](https://github.com/elliepsc/homebarista)"
         )
+
+    st.divider()
+    st.caption(f"build `{_build_marker()}`")
 
 # ------------------------------------------------------------------
 # Chat history
