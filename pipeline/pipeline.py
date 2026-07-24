@@ -435,8 +435,9 @@ def _demo_coaching(context: BrewingContext, diagnostic) -> str:
         f"[DEMO MODE] Based on your {context.machine_type} coffee problem ({symptom}), "
         f"the most likely cause is {cause}.\n\n"
         f"Recommended first step: {action}\n\n"
-        f"To see real AI-powered coaching, set DEMO_MODE=false and configure an LLM key "
-        f"in .env (GROQ_API_KEY by default — see .env.example)."
+        f"This is a free demo preview. For full science-backed AI coaching, "
+        f"switch to **Live (real AI coaching)** in the sidebar — unlock it with "
+        f"the shared password or paste your own API key."
     )
 
 
