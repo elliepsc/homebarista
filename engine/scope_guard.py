@@ -16,6 +16,7 @@ Design rules (see ultraplan v3, Phase A2):
 """
 
 import re
+import unicodedata
 
 REFUSAL_MESSAGE = (
     "☕ HomeBarista only answers questions about coffee: brewing, espresso, "
@@ -56,13 +57,28 @@ COFFEE_VOCAB = {
 _WORD_RE = re.compile(r"[a-zà-ÿ0-9]+")
 
 
+def _strip_accents(text: str) -> str:
+    """Fold diacritics so "cafe" matches "café" — many FR users type without
+    accents (mobile keyboards), and refusing "mon cafe est amer" would be a
+    false negative on a perfectly on-topic question."""
+    return "".join(
+        c for c in unicodedata.normalize("NFKD", text)
+        if not unicodedata.combining(c)
+    )
+
+
+# Accent-folded vocab, matched against accent-folded input (see _strip_accents).
+_COFFEE_VOCAB_FOLDED = {_strip_accents(w) for w in COFFEE_VOCAB}
+
+
 class ScopeGuard:
     """Deterministic in-scope / out-of-scope classifier. No LLM, no network."""
 
     MAX_INPUT_CHARS = 1500
 
     def _has_coffee_word(self, text: str) -> bool:
-        return any(w in COFFEE_VOCAB for w in _WORD_RE.findall(text.lower()))
+        folded = _strip_accents(text.lower())
+        return any(w in _COFFEE_VOCAB_FOLDED for w in _WORD_RE.findall(folded))
 
     def check(self, text: str, conversation_history: list[dict] | None = None) -> dict:
         """
