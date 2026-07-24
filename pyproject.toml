@@ -14,29 +14,12 @@ dependencies = [
   "nltk>=3.8",
   "rank-bm25>=0.2.2",
   "openai>=1.40",
-  # Declared explicitly (though pulled in via sentence-transformers too) so
-  # the CPU-index redirect in [tool.uv.sources] below actually applies —
-  # uv only honours sources for direct dependencies.
-  "torch>=2.2",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
 ]
-
-# torch arrives transitively via sentence-transformers. On PyPI the Linux
-# wheel drags in the full CUDA stack (nvidia-cuda-*, triton, ~2GB) — dead
-# weight on Streamlit Cloud (CPU-only) that slows cold starts and eats the
-# small free-tier RAM. Redirect torch to PyTorch's CPU index, scoped to
-# Linux so local Windows/Mac dev keeps the default PyPI build.
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[tool.uv.sources]
-torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [build-system]
 requires = ["hatchling"]
