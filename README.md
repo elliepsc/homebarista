@@ -131,13 +131,18 @@ Everything runs inside compose: ChromaDB is embedded in the app container in per
 
 ### Cloud
 
-<!-- TODO Phase I: add the public Streamlit Cloud URL here. -->
-Streamlit Cloud deployment: pending (main file `app/streamlit_app.py`).
+**Live app: [homebarista-coach.streamlit.app](https://homebarista-coach.streamlit.app/)** (main file `app/streamlit_app.py`).
 
-1. Push this repo to GitHub (public or private).
+- **Demo mode is the default** — open the link and try it in seconds, no key, no login. It runs the deterministic diagnostic engine on taste problems and gives mock coaching text.
+- **Live mode** (real RAG retrieval + LLM coaching) is opt-in per visitor: unlock with the shared password *or* paste your own Groq/Anthropic/OpenAI key (session-only, never stored). To keep the Groq free tier (8 000 tokens/min) from throttling, the shared key runs the **linear pipeline** (1 LLM call/request); a bring-your-own key gets the full **agentic** loop.
+- The sidebar shows a `build <sha>` marker — the exact commit running, so you can confirm which version you're testing.
+
+To deploy your own instance:
+
+1. Push this repo to GitHub.
 2. On [share.streamlit.io](https://share.streamlit.io), "New app" → pick the repo/branch → main file path `app/streamlit_app.py`.
-3. In the app's **Settings → Secrets**, paste the content of [`.streamlit/secrets.toml.example`](.streamlit/secrets.toml.example) with real values (`LLM_API_KEY`, `LIVE_PASSWORD`). Keep `DEMO_MODE = "true"` so the app is free to browse by default.
-4. Deploy. `requirements.txt` (uv-exported) is used automatically; Python version comes from `pyproject.toml` (`>=3.11`).
+3. In the app's **Settings → Secrets**, paste the content of [`.streamlit/secrets.toml.example`](.streamlit/secrets.toml.example) with real values (`LLM_API_KEY`, `LIVE_PASSWORD`, and the `SNAPSHOT_GITHUB_*` keys that let the app pull the knowledge-base snapshot at boot). Keep `DEMO_MODE = "true"` so the app is free to browse by default.
+4. Deploy. Dependencies come from `uv.lock` (uv-sync); Python version from `pyproject.toml` (`>=3.11`).
 
 ### Ingestion (live corpus)
 
@@ -155,7 +160,7 @@ Live ingestion must run from a residential machine (YouTube blocks transcript fe
 - **Streamlit chat app** (`app/streamlit_app.py`): multi-turn conversation, 5 one-click example problems, diagnostic/sources/quality-check expanders. **Demo mode is the default and needs zero API keys** — a reviewer can test in 10 seconds.
 - **Feedback loop**: 👍/👎 + optional comment after each coaching → `logs/feedback.jsonl`, joined to `logs/sessions.jsonl` by session id.
 - **Monitoring dashboard** (`app/pages/1_Monitoring.py`): 7 charts (sessions/day, quality verdicts, machines, symptoms, status incl. out-of-scope rate, feedback, agent iterations) + 4 headline metrics. Committed sample logs keep it populated on a fresh clone.
-- **Cost guardrails**: deterministic ScopeGuard refuses off-topic requests at zero token cost; input capped at 1500 chars; live mode locked behind a password or bring-your-own API key (session-only, never stored); agent loop capped at 8 iterations. Budget: a bring-your-own key is unlimited (visitor's own cost); the shared password is capped at 10 runs/session **and** a 25-run/day global budget shared across all visitors, so a session reset can't be used to bypass the cap.
+- **Cost guardrails**: deterministic ScopeGuard refuses off-topic requests at zero token cost; input capped at 1500 chars; live mode locked behind a password or bring-your-own API key (session-only, never stored); agent loop capped at 8 iterations. Budget: a bring-your-own key is unlimited (visitor's own cost) and runs the full agentic loop; the shared password runs the **linear pipeline (1 LLM call/request)** to stay under the Groq free-tier 8 000 tokens/min limit, and is capped at 10 runs/session **and** a 25-run/day global budget shared across all visitors, so a session reset can't be used to bypass the cap.
 
 ## 6. Honest limitations
 
@@ -181,5 +186,5 @@ Live ingestion must run from a residential machine (YouTube blocks transcript fe
 | Hybrid search (bonus) | BM25+vector RRF, evaluated in §3 |
 | Re-ranking (bonus) | cross-encoder ms-marco-MiniLM-L-12-v2 |
 | Query rewriting (bonus) | `_build_query` + `query_override`, evaluated C2 vs C4 |
-| Cloud deployment (bonus) | Streamlit Cloud (pending URL) |
+| Cloud deployment (bonus) | [homebarista-coach.streamlit.app](https://homebarista-coach.streamlit.app/) (Streamlit Cloud) |
 | Extra: agentic loop, deterministic engine, CI, ScopeGuard | `orchestration/agent.py`, `engine/`, `.github/workflows/ci.yml` |
