@@ -366,17 +366,19 @@ async def _run_linear(
 # failures on the 2026-07-21 live run (C10 post-fix) regardless of style.
 STYLE_GUIDANCE = {
     "detailed": (
-        "Write a thorough, step-by-step explanation, roughly 400-600 words. "
-        "Cover the science behind the root cause, walk through each "
-        "adjustment one at a time, and anticipate a likely follow-up question."
+        "Write a thorough, step-by-step explanation. Target 400-600 words and "
+        "do NOT exceed 680 words. Cover the science behind the root cause, walk "
+        "through each adjustment one at a time, and anticipate a likely follow-up."
     ),
     "concise": (
-        "Be brief and to the point, roughly 150-250 words. Give only the "
-        "essential fix and the single most important reason why — no filler."
+        "Be brief and to the point. Target 150-250 words, and never fewer than "
+        "130. Give only the essential fix and the single most important reason "
+        "why — no filler."
     ),
     "technical": (
-        "Use precise technical language, roughly 300-450 words: extraction "
-        "chemistry, exact parameter deltas, and the mechanism behind the fix."
+        "Use precise technical language. Target 300-450 words (never fewer than "
+        "130, never more than 680): extraction chemistry, exact parameter "
+        "deltas, and the mechanism behind the fix."
     ),
 }
 
@@ -418,11 +420,12 @@ EXPERT KNOWLEDGE:
 
 STYLE: {style} — {STYLE_GUIDANCE[style]}
 RULES:
-- Give specific measurements (grams, seconds, degrees Celsius, grind notches).
-- Name the root cause explicitly and early, using the phrase "{root_cause_name}" naturally in a sentence.
+- Give at least TWO specific measurements (grams, seconds, degrees Celsius, grind notches).
+- Name the root cause explicitly and early, using the words "{root_cause_name}" in a sentence.
 - Explain WHY the fix works with a clear "because"/"due to" statement.
-- End with an explicit validation test starting with a phrase like "You should notice...",
-  "You should taste...", "Test by...", or "Verify by...", so the user knows how to confirm the fix worked.
+- Respect the word-count target in the STYLE line above: never fewer than 130 words, never more than 680.
+- End with EXACTLY ONE validation sentence beginning with one of: "You should notice",
+  "You should taste", "Test by", or "Verify by" — so the user knows how to confirm the fix worked.
 """
 
     response = client.create(

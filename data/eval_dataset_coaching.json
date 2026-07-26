@@ -234,6 +234,15 @@
     "domain": "machine"
   },
   {
+    "query_id": "q041",
+    "synthetic_query": "Which coffees did you end up choosing from the 26 samples to be served at Noma in Mexico?",
+    "relevant_chunk_ids": [
+      "me1a3Z7GSbE_7cdd7660"
+    ],
+    "machine_type": "espresso",
+    "domain": "method"
+  },
+  {
     "query_id": "q043",
     "synthetic_query": "I just got a new coffee maker that came in a box with a little arrow on it—how do I open it, assemble the parts, add the filter and coffee, and brew a cup (should I use a clear mug and how much coffee to use)?",
     "relevant_chunk_ids": [

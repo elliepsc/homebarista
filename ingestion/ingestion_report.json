@@ -1,27 +1,31 @@
 {
-  "run_at": "2026-07-17T08:41:56.971064+00:00",
-  "duration_seconds": 409.1,
+  "run_at": "2026-07-21T10:22:07.222080+00:00",
+  "duration_seconds": 478.6,
   "mode": "live",
-  "channel_filter": "UC3KGOt3IfrVxDNtz5o7H-5A",
+  "channel_filter": "UCR2_8uHyWcTSV6iIw6BN4rg",
   "videos_fetched": 11,
-  "videos_skipped_non_informative": 1,
-  "total_chunks_generated": 14,
-  "total_chunks_indexed": 55,
+  "videos_skipped_non_informative": 0,
+  "total_chunks_generated": 137,
+  "total_chunks_indexed": 725,
   "domain_distribution": {
-    "method": 10,
-    "grind": 2,
-    "machine": 2
+    "grind": 22,
+    "method": 83,
+    "machine": 14,
+    "extraction": 18
   },
   "method_distribution": {
-    "aeropress": 4,
-    "espresso": 8,
-    "general": 2
+    "espresso": 124,
+    "v60": 13
   },
   "chunks_per_channel": {
-    "European Coffee Trip": 14
+    "Lance Hedrick": 137
   },
   "quota_used": 0,
-  "stop_reason": null,
+  "stop_reason": {
+    "reason": "max_videos_per_run",
+    "resume_video_id": "eVF7DOxOUFA",
+    "channel": "UCR2_8uHyWcTSV6iIw6BN4rg"
+  },
   "embedding_model": "all-MiniLM-L6-v2",
   "chunk_size_tokens": 400,
   "overlap_tokens": 80

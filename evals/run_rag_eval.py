@@ -112,7 +112,7 @@ def eval_style(style: str, dataset: list[dict]) -> tuple[dict, list[str]]:
     """Run the linear pipeline live for one style. Returns (stats, coachings)."""
     from pipeline.pipeline import run_pipeline
 
-    stats = {"pass": 0, "scores": [], "failed_checks": Counter(), "errors": 0}
+    stats = {"pass": 0, "scores": [], "failed_checks": Counter(), "errors": 0, "unscored": 0}
     coachings: list[str] = []
 
     for n, item in enumerate(dataset, start=1):
@@ -127,7 +127,20 @@ def eval_style(style: str, dataset: list[dict]) -> tuple[dict, list[str]]:
             print(f"  [{n}/{len(dataset)}] {result['status']} — skipped")
             continue
 
-        post = result["evaluation"]["post"]
+        # A "coaching" status without evaluation.post means the LIVE pipeline
+        # routed this query to the general-question path (_answer_general_linear
+        # → _info_result, evaluation={}), which produces no diagnostic coaching
+        # to score. build_coaching_dataset can't perfectly pre-filter these: it
+        # replays the guard with the demo-mode (rule) extractor, whereas the live
+        # eval uses the LLM extractor, so the two can disagree on a handful of
+        # borderline queries. Count them as "unscored" (not errors) and skip the
+        # structural scoring — never crash the whole run on one of them.
+        post = result.get("evaluation", {}).get("post")
+        if not post:
+            stats["unscored"] += 1
+            print(f"  [{n}/{len(dataset)}] general answer (no diagnostic) — unscored")
+            continue
+
         stats["pass"] += post["verdict"] == "pass"
         stats["scores"].append(post["overall_score"])
         for check, ok in post["checks"].items():
@@ -144,6 +157,8 @@ def eval_style(style: str, dataset: list[dict]) -> tuple[dict, list[str]]:
             "mean_score": round(sum(stats["scores"]) / n_scored, 3),
             "failed_checks": dict(stats["failed_checks"]),
             "errors": stats["errors"],
+            "unscored": stats["unscored"],
+            "n_scored": len(stats["scores"]),
         },
         coachings,
     )
@@ -234,13 +249,23 @@ def main(llm_judge: bool) -> None:
     out_path = RESULTS_DIR / f"rag_eval_{stamp}.json"
     out_path.write_text(json.dumps(output, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    # Markdown table ready to paste in the README
-    print("\n| Style | Pass rate | Mean score | Errors |")
-    print("|---|---|---|---|")
+    # Markdown table ready to paste in the README. n_scored is shown on purpose:
+    # a pass_rate is only meaningful next to the number of queries it was computed
+    # over. "unscored" = queries the LIVE pipeline routed to the general-answer
+    # path (factual/how-to, no taste symptom) — not applicable to style scoring.
+    print("\n| Style | Pass rate | Mean score | Scored (n) | Unscored | Errors |")
+    print("|---|---|---|---|---|---|")
     for style, stats in per_style.items():
         mark = " **(winner)**" if style == winner else ""
-        print(f"| {style}{mark} | {stats['pass_rate']} | {stats['mean_score']} | {stats['errors']} |")
+        print(
+            f"| {style}{mark} | {stats['pass_rate']} | {stats['mean_score']} | "
+            f"{stats.get('n_scored', '?')} | {stats.get('unscored', 0)} | {stats['errors']} |"
+        )
     print(f"\nWinner: {winner} — verdict {verdict}")
+    n_scored_winner = per_style[winner].get("n_scored", 0)
+    if n_scored_winner < 20:
+        print(f"NOTE: winner scored on only n={n_scored_winner} diagnostic queries — "
+              f"report this n in the README; the pass_rate is high-variance at this size.")
     print("Reminder: make the winner the default coach_style in run_pipeline and the app.")
     print(f"Results written to {out_path}")
 

@@ -2,6 +2,12 @@
 Monitoring dashboard — reads logs/sessions.jsonl + logs/feedback.jsonl.
 Falls back to the committed *.sample.jsonl files so the dashboard is never
 empty on a fresh clone. 7 charts + 4 headline metrics.
+
+Presentation notes (no data is created or transformed here beyond display):
+- headline numbers are compact metric cards, not st.metric tiles;
+- chart height scales with the number of points, so 2 sessions don't get the
+  same canvas as 200;
+- chart colors come from the espresso palette in .streamlit/config.toml.
 """
 
 import json
@@ -10,8 +16,14 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="HomeBarista — Monitoring", page_icon="📊", layout="wide")
-st.title("📊 Monitoring")
+from app import ui
+
+st.set_page_config(page_title="HomeBarista — Monitoring", page_icon="☕", layout="wide")
+ui.inject_css()
+
+ACCENT = "#6F4E37"
+SUCCESS = "#397057"
+MUTED = "#B0A79C"
 
 
 def load_jsonl(path: str) -> pd.DataFrame:
@@ -21,6 +33,18 @@ def load_jsonl(path: str) -> pd.DataFrame:
     rows = [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
     return pd.DataFrame(rows)
 
+
+def chart_height(n_points: int) -> int:
+    """Small datasets get a small canvas — a near-empty chart should not own
+    a third of the screen."""
+    return int(min(300, max(150, 60 + 30 * max(n_points, 1))))
+
+
+def bar(data, color=ACCENT) -> None:
+    st.bar_chart(data, color=color, height=chart_height(len(data)))
+
+
+ui.page_header("HomeBarista Coach", "Monitoring", "Session quality, coverage and user feedback.")
 
 sessions = load_jsonl("logs/sessions.jsonl")
 using_sample = False
@@ -44,56 +68,97 @@ sessions["date"] = pd.to_datetime(sessions["timestamp"], format="ISO8601").dt.da
 # ------------------------------------------------------------------
 # Headline metrics
 # ------------------------------------------------------------------
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total sessions", len(sessions))
-pass_rate = (sessions["verdict"] == "pass").mean() if "verdict" in sessions else 0.0
-col2.metric("Quality pass rate", f"{pass_rate:.0%}")
+n_sessions = len(sessions)
+if "verdict" in sessions:
+    n_pass = int((sessions["verdict"] == "pass").sum())
+    pass_rate = n_pass / n_sessions if n_sessions else 0.0
+else:
+    n_pass, pass_rate = 0, 0.0
 oos_rate = (sessions["status"] == "out_of_scope").mean()
-col3.metric("Out-of-scope rate", f"{oos_rate:.0%}")
+
+cards = [
+    {"label": "Sessions", "value": f"{n_sessions}"},
+    {"label": "Quality pass", "value": f"{pass_rate:.0%}", "sub": f"{n_pass} of {n_sessions}"},
+    {"label": "Out of scope", "value": f"{oos_rate:.0%}", "sub": "refused at zero token cost"},
+]
 if not feedback.empty:
     satisfaction = (feedback["rating"] == "up").mean()
-    col4.metric("👍 Satisfaction", f"{satisfaction:.0%}")
+    cards.append({
+        "label": "Satisfaction",
+        "value": f"{satisfaction:.0%}",
+        "sub": f"{len(feedback)} rating{'s' if len(feedback) != 1 else ''}",
+    })
 else:
-    col4.metric("👍 Satisfaction", "no data")
+    cards.append({"label": "Satisfaction", "value": "—", "sub": "no ratings yet"})
 
-st.divider()
+ui.metric_cards(cards)
+
+# ------------------------------------------------------------------
+# Recent sessions — display-only reshaping of columns already logged
+# ------------------------------------------------------------------
+ui.section_label("Recent sessions")
+recent = sessions.sort_values("timestamp", ascending=False).head(8)
+recent_view = pd.DataFrame({
+    "When": pd.to_datetime(recent["timestamp"], format="ISO8601").dt.strftime("%d %b %H:%M"),
+    "Problem": recent["raw_problem"].fillna("").str.slice(0, 70),
+    "Machine": recent["machine_type"].map(lambda v: ui.humanize_label(v, "Unknown")),
+    "Status": recent["status"].map(lambda v: ui.humanize_label(v, "—")),
+    "Quality": recent["verdict"].map(lambda v: ui.VERDICT_LABELS.get(str(v).lower(), "—")),
+})
+st.dataframe(recent_view, hide_index=True)  # width defaults to "stretch"
 
 # ------------------------------------------------------------------
 # Charts
 # ------------------------------------------------------------------
-left, right = st.columns(2)
+ui.rule()
+left, right = st.columns(2, gap="large")
 
 with left:
-    st.subheader("1 · Sessions per day")
-    st.bar_chart(sessions.groupby("date").size())
+    ui.section_label("Sessions per day")
+    bar(sessions.groupby("date").size())
 
-    st.subheader("3 · Machines detected")
-    st.bar_chart(sessions["machine_type"].fillna("unknown").value_counts())
+    ui.section_label("Machines detected")
+    bar(sessions["machine_type"].fillna("unknown").map(ui.humanize_label).value_counts())
 
-    st.subheader("5 · Session status")
-    st.caption("coaching · clarification_needed · out_of_scope · error — "
-               "out_of_scope = requests refused by the ScopeGuard at zero token cost")
-    st.bar_chart(sessions["status"].value_counts())
+    ui.section_label("Session status")
+    st.caption(
+        "Coaching · clarification needed · out of scope · error — out of scope "
+        "requests are refused by the ScopeGuard at zero token cost."
+    )
+    bar(sessions["status"].map(ui.humanize_label).value_counts())
 
-    st.subheader("7 · Agent iterations per session")
-    st.bar_chart(sessions["iterations"].value_counts().sort_index())
+    ui.section_label("Agent iterations per session")
+    bar(sessions["iterations"].value_counts().sort_index())
 
 with right:
-    st.subheader("2 · Quality verdicts (pass / warn / fail)")
-    st.bar_chart(sessions["verdict"].fillna("n/a").value_counts())
+    ui.section_label("Quality verdicts")
+    verdicts = (
+        sessions["verdict"].fillna("n/a")
+        .map(lambda v: ui.VERDICT_LABELS.get(str(v).lower(), ui.humanize_label(v)))
+        .value_counts()
+    )
+    bar(verdicts, color=SUCCESS)
 
-    st.subheader("4 · Top symptoms")
+    ui.section_label("Top symptoms")
     symptoms = sessions["symptoms"].explode().dropna()
     if symptoms.empty:
         st.caption("No symptoms logged yet.")
     else:
-        st.bar_chart(symptoms.value_counts())
+        bar(symptoms.map(ui.humanize_label).value_counts())
 
-    st.subheader("6 · User feedback 👍/👎")
+    ui.section_label("User feedback")
     if feedback.empty:
         st.caption("No feedback logged yet — rate a coaching in the main app.")
     else:
-        st.bar_chart(feedback["rating"].value_counts())
+        ratings = feedback["rating"].map({"up": "Helpful", "down": "Not helpful"}).value_counts()
+        bar(ratings, color=SUCCESS)
+
         feedback["date"] = pd.to_datetime(feedback["timestamp"], format="ISO8601").dt.date
         st.caption("Feedback over time")
-        st.bar_chart(feedback.groupby(["date", "rating"]).size().unstack(fill_value=0))
+        over_time = feedback.groupby(["date", "rating"]).size().unstack(fill_value=0)
+        over_time = over_time.rename(columns={"up": "Helpful", "down": "Not helpful"})
+        st.bar_chart(
+            over_time,
+            color=[SUCCESS if c == "Helpful" else MUTED for c in over_time.columns],
+            height=chart_height(len(over_time)),
+        )

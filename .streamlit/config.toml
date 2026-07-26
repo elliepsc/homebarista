@@ -1,0 +1,71 @@
+# HomeBarista Coach — app theme
+# ==============================
+# "Coffee-tech premium": calm, precise, lots of white space, espresso used
+# sparingly as an accent (CTA / active state / small important signals).
+#
+# Everything here is NATIVE Streamlit theming (>= 1.53 config surface —
+# this project pins streamlit 1.57). The visual layer that config.toml
+# cannot express lives in app/assets/styles.css, deliberately thin.
+#
+# Palette
+#   background   #F8F7F4   surface  #FFFFFF   border   #E7E3DC
+#   text         #26231F   muted    #77716A
+#   espresso     #6F4E37   dark     #493326   success  #397057
+
+[theme]
+base = "light"
+
+primaryColor            = "#6F4E37"   # espresso — CTA, active state, focus ring
+backgroundColor         = "#F8F7F4"
+secondaryBackgroundColor = "#FFFFFF"  # cards, expanders, user chat bubble
+textColor               = "#26231F"
+linkColor               = "#6F4E37"
+borderColor             = "#E7E3DC"
+dataframeBorderColor    = "#E7E3DC"
+dataframeHeaderBackgroundColor = "#F8F7F4"
+codeBackgroundColor     = "#F8F7F4"
+codeTextColor           = "#493326"
+
+# Inter, loaded natively by Streamlit (no CSS @import hack, no extra
+# dependency). Falls back to the browser sans-serif stack if unreachable.
+font        = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+codeFont    = "monospace"
+
+baseFontSize   = 16
+baseFontWeight = 400
+# h1 40px · h2 26px · h3 18px · h4 16px · h5 15px · h6 13px
+headingFontSizes   = ["2.5rem", "1.625rem", "1.125rem", "1rem", "0.9375rem", "0.8125rem"]
+headingFontWeights = [600, 600, 600, 600, 600, 600]
+metricValueFontSize   = "1.75rem"
+metricValueFontWeight = 600
+
+baseRadius   = "12px"
+buttonRadius = "10px"
+
+showWidgetBorder  = true
+showSidebarBorder = true
+
+# Neutral / espresso chart palettes — kills the default Streamlit blue.
+chartCategoricalColors = [
+  "#6F4E37", "#397057", "#B08968", "#77716A", "#493326",
+  "#8FB3A3", "#C7B9A8", "#A6836A", "#5C6B66", "#D8D2C8",
+]
+chartSequentialColors = [
+  "#F3EFEA", "#E7DFD6", "#D9CCBE", "#C9B4A0", "#B89B82",
+  "#A48265", "#8E6A4D", "#79573C", "#63452E", "#493326",
+]
+chartDivergingColors = [
+  "#493326", "#79573C", "#A48265", "#C9B4A0", "#E7DFD6",
+  "#DCE7E1", "#B4CFC1", "#7FB19A", "#4E8C71", "#2E5C49",
+]
+
+[theme.sidebar]
+backgroundColor          = "#FFFFFF"
+secondaryBackgroundColor = "#F8F7F4"
+borderColor              = "#E7E3DC"
+# Sidebar headings do not inherit [theme] sizes — set them explicitly small.
+headingFontSizes = ["1.0625rem", "0.9375rem", "0.875rem", "0.8125rem", "0.75rem", "0.6875rem"]
+
+[client]
+toolbarMode = "minimal"

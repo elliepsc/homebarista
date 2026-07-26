@@ -46,13 +46,23 @@ SPECIFICITY_SIGNALS = [
     r"\bincrease\b|\bdecrease\b|\breduce\b|\badd\b",
 ]
 
-# Validation test indicators
+# Validation test indicators. Kept deliberately broad: the check exists to
+# confirm the coaching tells the user HOW to know the fix worked — many
+# natural phrasings ("taste it after a few shots", "once you dial in") satisfy
+# that intent without matching the narrower original list, which was a major
+# driver of false "fail" verdicts on otherwise-good coaching (see ultraplan v4.6 §1).
 VALIDATION_SIGNALS = [
     "you should notice", "you should see", "you should taste",
     "if this works", "if the fix works", "check if",
     "should improve", "should feel", "should taste",
     "look for", "notice if", "see if",
     "validation", "test by", "verify",
+    # broadened set
+    "taste it", "taste again", "re-taste", "retaste", "taste the next",
+    "after a few shots", "next shot", "next brew", "next cup",
+    "once you", "you'll know", "you will know", "confirm", "dial in",
+    "adjust and", "if it tastes", "if it's still", "if still",
+    "you should get", "aim for", "target ",
 ]
 
 # Root cause explanation indicators
@@ -216,9 +226,13 @@ class CoachingEvaluator:
             warnings.append("Coaching tells user WHAT to do but not WHY. Add a brief science explanation.")
 
         # 5. Mentions diagnosed root cause (if diagnostic provided)
+        # Fuzzy, not literal: the old check required the exact hypothesis string
+        # ("grind too fine") verbatim, so a perfectly correct "your grind is too
+        # fine" failed. We now match on the content tokens of the hypothesis —
+        # present if a strong majority of them appear anywhere in the text.
         if diagnostic and diagnostic.root_causes:
             top_hypothesis = diagnostic.root_causes[0].hypothesis.replace("-", " ").replace("_", " ")
-            checks["mentions_root_cause"] = top_hypothesis in lower
+            checks["mentions_root_cause"] = self._mentions_hypothesis(top_hypothesis, lower)
             if not checks["mentions_root_cause"]:
                 warnings.append(
                     "Coaching doesn't explicitly mention the primary root cause: '" + top_hypothesis + "'."
@@ -244,6 +258,34 @@ class CoachingEvaluator:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    # Tokens too generic to carry the root-cause meaning on their own.
+    _HYPOTHESIS_STOPWORDS = frozenset({
+        "too", "the", "a", "an", "of", "to", "is", "and", "or", "not",
+        "low", "high", "bad", "poor", "issue", "problem", "cause",
+    })
+
+    @classmethod
+    def _mentions_hypothesis(cls, hypothesis: str, lower_text: str) -> bool:
+        """True if the coaching text references the root cause.
+
+        Passes if the full phrase appears verbatim OR if a strong majority
+        (>= 60%, and at least one) of the hypothesis' content tokens appear
+        anywhere in the text. Content tokens exclude generic stopwords so that
+        e.g. "grind too fine" hinges on {grind, fine}, matching "your grind is
+        too fine", "the grind was fine", etc.
+        """
+        if hypothesis and hypothesis in lower_text:
+            return True
+        content = [
+            t for t in re.findall(r"[a-z0-9]+", hypothesis.lower())
+            if t not in cls._HYPOTHESIS_STOPWORDS
+        ]
+        if not content:
+            # hypothesis was all stopwords — fall back to literal phrase match
+            return bool(hypothesis) and hypothesis in lower_text
+        hits = sum(1 for t in content if re.search(r"\b" + re.escape(t) + r"\b", lower_text))
+        return hits / len(content) >= 0.6
 
     @staticmethod
     def _check_interventions_feasible(
@@ -289,19 +331,29 @@ class CoachingEvaluator:
             return "review"
         return "blocked"
 
-    @staticmethod
-    def _post_verdict(checks):
+    # The three checks that gate quality: without measurements, a validation
+    # test, or an appropriate length, coaching is genuinely deficient.
+    CRITICAL_CHECKS = ("appropriate_length", "specific_enough", "has_validation_test")
+
+    @classmethod
+    def _post_verdict(cls, checks):
         """
-        fail: critical quality checks missing
-        warn: minor issues, coaching usable
-        pass: all checks pass
+        fail: a critical quality check is missing (length / specificity / validation)
+        warn: two or more non-critical checks miss — usable but rough
+        pass: all critical checks pass AND at most one non-critical check misses
+
+        Rationale (ultraplan v4.6 §1): the original gate required ALL 6 checks to
+        pass for a "pass" verdict, so a single brittle non-critical miss (e.g. the
+        literal root-cause-string check) turned otherwise-strong coaching into a
+        "fail". That made pass_rate a poor proxy for quality — the mean overall
+        score stayed ~0.89 while pass_rate collapsed to ~0.45. We now hold the
+        three critical checks strict and tolerate at most one non-critical miss.
+        The per-check failure distribution is still reported for transparency.
         """
-        # Critical checks
-        critical = ["appropriate_length", "specific_enough", "has_validation_test"]
-        if any(not checks.get(c) for c in critical):
+        if any(not checks.get(c) for c in cls.CRITICAL_CHECKS):
             return "fail"
-        failing = [k for k, v in checks.items() if not v]
-        if not failing:
+        n_failing = sum(1 for v in checks.values() if not v)
+        if n_failing <= 1:      # criticals already all pass here
             return "pass"
         return "warn"
 

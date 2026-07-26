@@ -32,6 +32,7 @@ from dotenv import load_dotenv
 
 load_dotenv()  # LLM_*, DEMO_MODE, CHROMA_PERSIST_DIR from .env (see .env.example)
 
+from app import ui
 from engine.llm_client import DEFAULT_MODELS, get_provider
 from pipeline.pipeline import run_pipeline
 
@@ -114,6 +115,12 @@ EXAMPLE_PROBLEMS = [
 ]
 
 st.set_page_config(page_title="HomeBarista Coach", page_icon="☕", layout="wide")
+# layout="wide" + a max-width in styles.css: the content column is capped at a
+# comfortable measure instead of stretching across a 1920px screen, while the
+# sidebar and the floating chat dock keep their native behaviour.
+ui.inject_css()
+
+COACH_AVATAR = ":material/local_cafe:"  # monochrome Material icon, not an emoji
 
 # ------------------------------------------------------------------
 # Session state
@@ -142,19 +149,39 @@ def _write_feedback(session_id: str, rating: str, comment: str = "") -> None:
 # Sidebar
 # ------------------------------------------------------------------
 with st.sidebar:
-    st.title("☕ HomeBarista Coach")
-    st.caption("Science-backed coffee coaching from YouTube barista expertise")
+    ui.brand(
+        ["HomeBarista", "Coach"],
+        "Science-backed coffee coaching from YouTube barista expertise.",
+    )
 
-    style = st.radio("Coach style", STYLES, index=STYLES.index(WINNER_STYLE))
+    # NOTE: both controls stay st.radio, in this order (style, then mode).
+    # tests/test_streamlit_live_budget.py drives the mode via sidebar.radio[1]
+    # and sets it by its option string — the option values below must not
+    # change. format_func is display-only: "Demo (free, no key)" still is the
+    # value every branch below tests against.
+    style = st.radio(
+        "Coach style",
+        STYLES,
+        index=STYLES.index(WINNER_STYLE),
+        horizontal=True,
+        format_func=lambda s: s.capitalize(),
+    )
 
     llm_provider = get_provider()
     mode = st.radio(
         "Mode",
         ["Demo (free, no key)", "Live (real AI coaching)"],
+        horizontal=True,
+        format_func=lambda m: m.split(" (")[0],
         help="Demo mode uses the deterministic diagnostic engine with mock "
              "coaching text — no API key, no cost. Live mode calls the LLM "
              f"provider configured in .env (currently: {llm_provider}).",
     )
+
+    # Full budget wording is built here but rendered in the Settings expander
+    # at the bottom — a quota is context, not headline information. The
+    # headline stays a single quiet line ("N AI sessions remaining").
+    budget_detail = None
 
     if mode.startswith("Live"):
         if not st.session_state["live_unlocked"]:
@@ -181,16 +208,18 @@ with st.sidebar:
                     st.success("Live mode unlocked with your key.")
         if st.session_state["live_unlocked"]:
             if st.session_state["byo_api_key"]:
-                st.caption("Live budget: unlimited — you're using your own API key.")
+                budget_detail = "Live budget: unlimited — you're using your own API key."
+                ui.quota_note("Your own API key — no cap.")
             else:
                 session_remaining = MAX_LIVE_RUNS_PER_SESSION - st.session_state["live_runs"]
                 global_remaining = _shared_key_runs_remaining_today()
                 remaining = min(session_remaining, global_remaining)
-                st.caption(
+                budget_detail = (
                     f"Live budget: {max(remaining, 0)} runs left "
                     f"(session cap {MAX_LIVE_RUNS_PER_SESSION}, "
                     f"shared daily cap {MAX_LIVE_RUNS_GLOBAL_DAILY})."
                 )
+                ui.quota_note(f"{max(remaining, 0)} AI sessions remaining")
                 if remaining <= 0:
                     st.warning("Live budget exhausted — falling back to demo mode.")
 
@@ -201,7 +230,9 @@ with st.sidebar:
             st.session_state["pending_input"] = example
 
     st.divider()
-    with st.expander("Technical details"):
+    with st.expander("Settings & technical details"):
+        if budget_detail:
+            st.caption(budget_detail)
         st.markdown(
             "- **Retrieval**: MiniLM-L6-v2 bi-encoder + cross-encoder re-ranking "
             "(optional hybrid BM25+vector via RRF)\n"
@@ -212,23 +243,47 @@ with st.sidebar:
             "cost 0 tokens\n"
             "- [Source on GitHub](https://github.com/elliepsc/homebarista)"
         )
-
-    st.divider()
-    st.caption(f"build `{_build_marker()}`")
+        st.caption(f"build `{_build_marker()}`")
 
 # ------------------------------------------------------------------
 # Chat history
 # ------------------------------------------------------------------
-st.title("Describe your coffee problem")
+ui.banner()
+ui.page_header(
+    "Home Barista Coach",
+    "What's wrong with your coffee?",
+    "Tell me what you taste, what machine you use, or what you'd like to improve.",
+)
 
-for msg in st.session_state["messages"]:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+_messages = st.session_state["messages"]
+_last_result = st.session_state["last_result"]
+_last_index = len(_messages) - 1
+
+for _i, msg in enumerate(_messages):
+    if msg["role"] == "assistant":
+        with st.chat_message("assistant", avatar=COACH_AVATAR):
+            # Only the latest answer gets the structured treatment: the
+            # diagnosis/plan cards are built from `last_result`, which only
+            # describes that turn. Older turns keep their plain transcript.
+            if (
+                _i == _last_index
+                and _last_result
+                and _last_result.get("status") == "coaching"
+            ):
+                ui.render_coaching_answer(_last_result, msg["content"])
+            else:
+                st.markdown(msg["content"])
+    else:
+        with st.chat_message("user"):
+            st.markdown(msg["content"])
 
 # ------------------------------------------------------------------
 # Input handling
 # ------------------------------------------------------------------
-user_input = st.chat_input("Describe your coffee problem...", max_chars=1500)
+user_input = st.chat_input(
+    "Ask another coffee question…" if _messages else "Describe your coffee problem…",
+    max_chars=1500,
+)
 if not user_input:
     user_input = st.session_state.pop("pending_input", None)
 
@@ -247,7 +302,7 @@ if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar=COACH_AVATAR):
         with st.spinner("Diagnosing your coffee problem..."):
             # Agent mode (~4 LLM calls/run) only for visitors on their OWN
             # key — their budget, their cost. The shared free key runs the
@@ -291,18 +346,31 @@ if result and result["status"] == "coaching":
     diagnostic = result.get("diagnostic", {})
     evaluation = result.get("evaluation", {})
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Machine", (context.get("machine_type") or "unknown").replace("_", " "))
-    col2.metric("Diagnostic confidence", f"{diagnostic.get('diagnostic_confidence', 0):.0%}")
-    col3.metric("Quality verdict", evaluation.get("overall_verdict", "n/a"))
+    ui.rule()
+    ui.render_session_meta(result)
 
-    with st.expander("🔬 Diagnostic details"):
-        st.write("**Symptoms:**", ", ".join(diagnostic.get("symptoms", [])) or "none detected")
-        for rc in diagnostic.get("root_causes", []):
-            st.write(f"- {rc.get('hypothesis', '?')} (confidence {rc.get('confidence', 0):.0%})")
+    with st.expander("Diagnostic details"):
+        symptoms = diagnostic.get("symptoms", [])
+        st.markdown("**Symptoms detected**")
+        if symptoms:
+            st.markdown("\n".join(f"- {ui.humanize_label(s)}" for s in symptoms))
+        else:
+            st.caption("None detected")
+        root_causes = diagnostic.get("root_causes", [])
+        if root_causes:
+            st.markdown("**Ranked root causes**")
+            for rc in root_causes:
+                # RootCause exposes `probability` (a heuristic weight, NOT a true
+                # probability — see engine/models.py). The old key 'confidence' did
+                # not exist on the dataclass, so this always rendered 0%.
+                st.markdown(
+                    f"- {ui.humanize_label(rc.get('hypothesis', '?'))} "
+                    f"— heuristic weight {rc.get('probability', 0):.0%}"
+                )
+        st.caption(f"Session {result['session_id']}")
 
     if result.get("retrieved_chunks"):
-        with st.expander("📚 Knowledge sources"):
+        with st.expander("Knowledge sources"):
             for chunk in result["retrieved_chunks"][:5]:
                 st.markdown(
                     f"**{chunk.get('channel', '')} — {chunk.get('title', '')}**  \n"
@@ -311,25 +379,41 @@ if result and result["status"] == "coaching":
 
     post_eval = evaluation.get("post", {})
     if post_eval:
-        with st.expander("✅ Quality checks"):
+        with st.expander("Quality checks"):
             for check, ok in post_eval.get("checks", {}).items():
-                st.write(("✅" if ok else "❌") + f" {check}")
+                st.markdown(("✓ " if ok else "✗ ") + ui.humanize_label(check))
 
-    # Feedback — one rating per session_id
+    # Feedback — one rating per session_id (storage logic unchanged)
     session_id = result["session_id"]
+    comment_key = f"fb_comment_{session_id}"
     if session_id not in st.session_state["feedback_given"]:
-        st.caption(f"Was this coaching helpful? (session {session_id})")
-        comment = st.text_input("Optional comment", key=f"fb_comment_{session_id}")
-        col_up, col_down, _ = st.columns([1, 1, 6])
-        if col_up.button("👍", key=f"fb_up_{session_id}"):
+        ui.section_label("Was this helpful?")
+        col_up, col_down, _ = st.columns([1, 1.4, 5])
+        clicked_up = col_up.button("👍 Yes", key=f"fb_up_{session_id}")
+        clicked_down = col_down.button("👎 Not really", key=f"fb_down_{session_id}")
+
+        # The comment stays optional and out of the way. It is read back from
+        # session state rather than from the return value because the widget is
+        # declared *after* the buttons: on the rerun triggered by a click, the
+        # text typed before the click is already in session state.
+        with st.expander("Tell us why…"):
+            st.text_input(
+                "Optional comment",
+                key=comment_key,
+                label_visibility="collapsed",
+                placeholder="What could have been better? (optional)",
+            )
+        comment = st.session_state.get(comment_key, "")
+
+        if clicked_up:
             _write_feedback(session_id, "up", comment)
             st.session_state["feedback_given"].add(session_id)
             st.toast("Thanks for the feedback!")
             st.rerun()
-        if col_down.button("👎", key=f"fb_down_{session_id}"):
+        if clicked_down:
             _write_feedback(session_id, "down", comment)
             st.session_state["feedback_given"].add(session_id)
             st.toast("Thanks — noted for improvement.")
             st.rerun()
     else:
-        st.caption("✔️ Feedback recorded for this session — thank you!")
+        st.caption("Feedback recorded for this session — thank you.")
