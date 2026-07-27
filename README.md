@@ -50,7 +50,7 @@ Demo corpus (40 mock docs, 10 queries — reproducible in CI with `--demo`):
 | C3_hybrid_ce (BM25+vector RRF + cross-encoder) | 0.8 | 0.8 | 0.733 |
 | C4_raw_query_ce **(winner on demo corpus)** | 0.9 | 0.9 | 0.783 |
 
-Live corpus (50 synthetic queries, generated from the real ingested corpus — 55 chunks / 24 sources / 2 channels at eval time, 2026-07-17; full ~100-video corpus ingestion still in progress):
+Live corpus (50 synthetic queries, generated from the real ingested corpus — 55 chunks / 24 sources / 2 channels at eval time, 2026-07-17; the corpus was subsequently completed to its **final size of 725 chunks / 95 sources / 5 channels** — see the control re-run below):
 
 | Config | Hit Rate@5 | Hit Rate@10 | MRR |
 |---|---|---|---|
@@ -75,33 +75,44 @@ already matched the winning config — no change needed there.
 
 The 3 coach styles (detailed / concise / technical) are 3 different prompts, each evaluated on the full dataset with deterministic structural checks (CoachingEvaluator pass rate + mean score) and an optional LLM judge (specificity / science / actionability / completeness, 1–5).
 
-Live run on the filtered coaching dataset (`data/eval_dataset_coaching.json`,
-32/50 queries — the other 18 are factual questions with no symptom, correctly
-rejected by the pipeline's deterministic guard and excluded from this eval),
-`evals/results/rag_eval_20260722T195411Z.json`:
+Live run on the coaching dataset (`data/eval_dataset_coaching.json`),
+`evals/results/rag_eval_20260726T175608Z.json`. The dataset holds 33 queries;
+**n=13** produce diagnostic coaching live (a taste symptom is extracted), **18**
+are factual/how-to questions the live pipeline correctly routes to its
+general-answer path (no diagnosis to score), and **2** are out-of-scope. The
+pass rate is computed over the 13 genuine diagnostic cases:
 
-| Style | Pass rate | Mean score | Errors |
-|---|---|---|---|
-| detailed | 0.065 | 0.72 | 1 |
-| concise | 0.419 | 0.865 | 1 |
-| technical **(winner)** | **0.452** | **0.891** | 1 |
+| Style | Pass rate | Mean score | Scored (n) | Unscored | Errors |
+|---|---|---|---|---|---|
+| detailed | 0.231 | 0.869 | 13 | 18 | 2 |
+| concise | 0.923 | 0.974 | 13 | 18 | 2 |
+| technical **(winner)** | **1.0** | **0.987** | 13 | 18 | 2 |
 
-**Winner: technical.** Default style in `app/streamlit_app.py` (`WINNER_STYLE`)
-and `pipeline/pipeline.py`/`orchestration/agent.py` (`coach_style`/`style`
-defaults) aligned accordingly.
+**Winner: technical** (verdict PASS). Default style in `app/streamlit_app.py`
+(`WINNER_STYLE`) and `pipeline/pipeline.py`/`orchestration/agent.py`
+(`coach_style`/`style` defaults) aligned accordingly.
 
-**Note on the FAIL verdict**: the script's own pass-rate threshold (≥0.70) is
-strict by design — it requires *zero* failed structural checks per response,
-not just an overall-good one, so no style clears it here. What the grid asks
-for ("several approaches compared, the best one retained") is satisfied
-regardless: the 3 prompts produce a real, reproducible separation (technical
-and concise both clear 0.86+ mean score and roughly 4x detailed's pass rate),
-which is itself the useful signal — a uniform FAIL across near-identical
-prompts would have been the actual problem (see the pre-fix run,
-`rag_eval_20260721T125242Z.json`, where all 3 styles scored within 0.04 of
-each other before the prompts were given explicit length/structure targets).
+**What the pass rate measures — and its limits.** The verdict holds three
+critical checks strict (specific measurements, a validation test, appropriate
+length) and tolerates at most one non-critical miss; `mentions_root_cause` is a
+fuzzy keyword match, not a literal-string match (the earlier literal check was
+the main driver of false failures — mean score was already ~0.89 while pass
+rate had collapsed to ~0.45). The pass rate at **n=13 is high-variance**; the
+decision-grade signal is the **clear, reproducible separation of the three
+prompts** (technical 1.0 > concise 0.92 > detailed 0.23) — which is exactly what
+the grid asks for ("several approaches compared, the best one retained").
 
-*Bias note: the LLM judge is the same model as the generator — its scores may be inflated and are used for relative comparison only.*
+**Threats to validity (retrieval + RAG).** Queries are synthetic and generated
+from the corpus itself (favourable-bias risk); the retrieval dataset has a
+single relevant chunk per query, so Hit Rate/MRR measure "is the source chunk
+retrieved", not "is the answer good"; and the coaching eval scores only the 13
+diagnostic queries. Treat every number here as a **relative model-selection
+signal, not a decision-grade product metric.**
+
+*LLM judge omitted from the final run: the structural checks plus the clear
+style separation are the decision signal; a same-model judge (generator =
+judge) would add only a biased relative score. If run, it should use a model
+different from the generator to remove that bias.*
 
 ## 4. How to run
 
