@@ -24,6 +24,8 @@ ui.inject_css()
 ACCENT = "#6F4E37"
 SUCCESS = "#397057"
 MUTED = "#B0A79C"
+RECENT_SESSION_LIMIT = 10
+FEEDBACK_DAYS = 7
 
 
 def load_jsonl(path: str) -> pd.DataFrame:
@@ -181,7 +183,8 @@ st.dataframe(pd.DataFrame(summary_rows), hide_index=True, use_container_width=Tr
 # Recent sessions
 # ------------------------------------------------------------------
 ui.section_label("Recent sessions")
-recent = sessions.sort_values("timestamp", ascending=False).head(8)
+st.caption(f"Showing the {RECENT_SESSION_LIMIT} most recent sessions.")
+recent = sessions.sort_values("timestamp", ascending=False).head(RECENT_SESSION_LIMIT)
 recent_view = pd.DataFrame({
     "When": pd.to_datetime(recent["timestamp"], format="ISO8601").dt.strftime("%d %b %H:%M"),
     "Problem": recent["raw_problem"].fillna("").str.slice(0, 70),
@@ -239,15 +242,21 @@ def render_user_feedback() -> None:
 
 
 def render_agent_iterations() -> None:
-    bar(sessions["iterations"].value_counts().sort_index(), label_size=18)
+    bar(sessions["iterations"].value_counts().sort_index())
 
 
 def render_feedback_over_time() -> None:
     if feedback.empty:
         st.caption("No feedback logged yet.")
     else:
-        feedback["date"] = pd.to_datetime(feedback["timestamp"], format="ISO8601").dt.date
-        over_time = feedback.groupby(["date", "rating"]).size().unstack(fill_value=0)
+        st.caption(f"Showing feedback from the last {FEEDBACK_DAYS} days.")
+        feedback_window = feedback.copy()
+        feedback_window["timestamp"] = pd.to_datetime(feedback_window["timestamp"], format="ISO8601")
+        latest_day = feedback_window["timestamp"].dt.normalize().max()
+        start_day = latest_day - pd.Timedelta(days=FEEDBACK_DAYS - 1)
+        feedback_window = feedback_window[feedback_window["timestamp"].dt.normalize() >= start_day]
+        feedback_window["date"] = feedback_window["timestamp"].dt.date
+        over_time = feedback_window.groupby(["date", "rating"]).size().unstack(fill_value=0)
         over_time = over_time.rename(columns={"up": "Helpful", "down": "Not helpful"})
         grouped_bar(over_time, colors=[SUCCESS if c == "Helpful" else MUTED for c in over_time.columns])
 
