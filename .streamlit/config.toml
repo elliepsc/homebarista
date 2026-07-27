@@ -69,3 +69,12 @@ headingFontSizes = ["1.0625rem", "0.9375rem", "0.875rem", "0.8125rem", "0.75rem"
 
 [client]
 toolbarMode = "minimal"
+
+[server]
+# Disable the source-file watcher. On Streamlit Cloud code updates arrive via
+# a git redeploy, not hot-reload, so the watcher serves no purpose here — and
+# it floods the logs by walking transformers' module tree (each image-processing
+# submodule lazily imports torchvision, which we don't install, raising a
+# harmless but noisy ModuleNotFoundError per module). Turning it off silences
+# that spam and trims a little startup work.
+fileWatcherType = "none"
