@@ -26,7 +26,7 @@ ONLINE — coaching loop (pipeline/ + engine/ + orchestration/)
     → SymptomExtractor (rules + optional LLM)
     → DiagnosticPlanner (deterministic capability map)
     → Retriever (vector or hybrid BM25+RRF → cross-encoder re-rank)
-    → Agent tool-use loop (LLM from .env — default Groq llama-3.3-70b,
+    → Agent tool-use loop (LLM from .env — default Groq openai/gpt-oss-120b,
       6 tools, max 8 iterations; see engine/llm_client.py)
       [demo mode / CI: linear deterministic pipeline instead]
     → CoachingEvaluator (deterministic quality checks)
@@ -173,12 +173,50 @@ Live ingestion must run from a residential machine (YouTube blocks transcript fe
 - **Monitoring dashboard** (`app/pages/1_Monitoring.py`): 7 charts (sessions/day, quality verdicts, machines, symptoms, status incl. out-of-scope rate, feedback, agent iterations) + 4 headline metrics. Committed sample logs keep it populated on a fresh clone.
 - **Cost guardrails**: deterministic ScopeGuard refuses off-topic requests at zero token cost; input capped at 1500 chars; live mode locked behind a password or bring-your-own API key (session-only, never stored); agent loop capped at 8 iterations. Budget: a bring-your-own key is unlimited (visitor's own cost) and runs the full agentic loop; the shared password runs the **linear pipeline (1 LLM call/request)** to stay under the Groq free-tier 8 000 tokens/min limit, and is capped at 10 runs/session **and** a 25-run/day global budget shared across all visitors, so a session reset can't be used to bypass the cap.
 
+### Live coaching example (real retrieval, verbatim)
+
+A taste problem triggers the full RAG path — deterministic diagnosis, then LLM
+coaching grounded in retrieved transcript passages, sources cited. Verbatim from
+the deployed app:
+
+> **User:** *my Gaggia makes sour espresso*
+>
+> **Diagnosis (60% confidence):** most likely cause — **under-extraction**.
+> Sour = extraction stopped before the acids were balanced by sugars and bitters.
+>
+> **Coaching (technical style):**
+> **Root cause** — under-extraction: too few soluble compounds (mainly acids and
+> sugars) are pulled before the flow stops, so the shot is dominated by bright,
+> acidic notes.
+> 1. **Grind −1 notch (≈10 µm finer)** — raises the surface-area-to-mass ratio, so
+>    the water dissolves more solids in the same brew time.
+> 2. **Temperature +2 °C (target 94 °C)** — extraction kinetics are
+>    temperature-dependent (Arrhenius); more heat accelerates dissolution of the
+>    larger, less-soluble compounds that add body and caramel sweetness.
+> 3. **Extend brew time +3–5 s (target 27–30 s for 18 g)** — each second past ~20 s
+>    extracts a higher proportion of sugars and lipids that counterbalance the acids.
+>
+> **Validation:** *you should notice a smoother, less acidic cup with a subtle
+> caramel sweetness and a crema that holds its colour for at least 30 seconds.*
+>
+> **Knowledge sources retrieved** (bi-encoder → cross-encoder re-rank):
+> - Lance Hedrick — *HOW TO FIX SOUR ESPRESSO: 4 Easy Tips* (2 passages)
+> - Lance Hedrick — *Why Light Roast Espresso Makes No Sense (And How To Fix It)* (2 passages)
+> - Lance Hedrick — *HOW TO DIAL IN ESPRESSO: Quick and Easy Guide*
+
+By contrast, a question with **no taste symptom** (e.g. *"how do I choose coffee —
+what brand, what country?"*) is routed to the general-answer path with **no
+retrieval** and no sources, by design — the RAG diagnostic flow is reserved for
+taste troubleshooting. *(The exact wording and figures of the LLM coaching vary
+run-to-run — sampling is non-deterministic — but the deterministic diagnosis and
+adjustment directions are stable.)*
+
 ## 6. Honest limitations
 
 - **LLM judge bias**: judge and generator are the same configured model; judge scores are relative, not absolute.
 - **Diagnostic weights are heuristics**, not calibrated probabilities — they encode expert rules, and are tested as such.
 - **Precision@k dropped** from the retrieval eval (single-relevant-chunk dataset caps it at 1/k); Hit Rate and MRR are the valid metrics in this setting.
-- **Demo-corpus eval numbers** (10 queries, 40 docs) are a smoke-level signal; the live 50-query eval is the decision-grade one.
+- **Demo-corpus eval numbers** (10 queries, 40 docs) are a smoke-level signal; the live 50-query eval is the stronger one (see the threats-to-validity note in §3 for how far to trust either).
 - **Transcripts**: fetched for research/educational use; sources are always cited (channel + video URL) in retrieved passages.
 
 ## 7. Zoomcamp criteria mapping
