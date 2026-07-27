@@ -12,6 +12,7 @@ Presentation notes:
 import json
 from pathlib import Path
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -38,8 +39,81 @@ def chart_height(n_points: int) -> int:
     return int(min(260, max(180, 70 + 28 * max(n_points, 1))))
 
 
-def bar(data, color=ACCENT) -> None:
-    st.bar_chart(data, color=color, height=chart_height(len(data)))
+def bar(data, color=ACCENT, label_size: int = 13) -> None:
+    """Bar chart with readable horizontal x labels."""
+    if data.empty:
+        st.caption("No data yet.")
+        return
+
+    frame = data.reset_index()
+    frame.columns = ["label", "value"]
+    frame["label"] = frame["label"].astype(str)
+
+    chart = (
+        alt.Chart(frame)
+        .mark_bar(color=color)
+        .encode(
+            x=alt.X(
+                "label:N",
+                title=None,
+                sort=None,
+                axis=alt.Axis(labelAngle=0, labelFontSize=label_size, labelLimit=160),
+            ),
+            y=alt.Y(
+                "value:Q",
+                title=None,
+                axis=alt.Axis(labelFontSize=12, grid=True),
+            ),
+            tooltip=[
+                alt.Tooltip("label:N", title="Label"),
+                alt.Tooltip("value:Q", title="Value"),
+            ],
+        )
+        .properties(height=chart_height(len(frame)))
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+
+def grouped_bar(data: pd.DataFrame, colors: list[str], label_size: int = 13) -> None:
+    """Grouped bar chart for small time-series tables."""
+    if data.empty:
+        st.caption("No data yet.")
+        return
+
+    frame = (
+        data.reset_index()
+        .melt(id_vars=data.index.name or "date", var_name="series", value_name="value")
+        .rename(columns={data.index.name or "date": "label"})
+    )
+    frame["label"] = frame["label"].astype(str)
+
+    chart = (
+        alt.Chart(frame)
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                "label:N",
+                title=None,
+                sort=None,
+                axis=alt.Axis(labelAngle=0, labelFontSize=label_size, labelLimit=160),
+            ),
+            xOffset=alt.XOffset("series:N"),
+            y=alt.Y("value:Q", title=None, axis=alt.Axis(labelFontSize=12, grid=True)),
+            color=alt.Color(
+                "series:N",
+                title=None,
+                scale=alt.Scale(range=colors),
+                legend=alt.Legend(orient="bottom", labelFontSize=13, titleFontSize=13),
+            ),
+            tooltip=[
+                alt.Tooltip("label:N", title="Date"),
+                alt.Tooltip("series:N", title="Series"),
+                alt.Tooltip("value:Q", title="Value"),
+            ],
+        )
+        .properties(height=chart_height(data.shape[0]))
+    )
+    st.altair_chart(chart, use_container_width=True)
 
 
 def chart_row(left_title: str, left_render, right_title: str, right_render) -> None:
@@ -165,7 +239,7 @@ def render_user_feedback() -> None:
 
 
 def render_agent_iterations() -> None:
-    bar(sessions["iterations"].value_counts().sort_index())
+    bar(sessions["iterations"].value_counts().sort_index(), label_size=18)
 
 
 def render_feedback_over_time() -> None:
@@ -175,11 +249,7 @@ def render_feedback_over_time() -> None:
         feedback["date"] = pd.to_datetime(feedback["timestamp"], format="ISO8601").dt.date
         over_time = feedback.groupby(["date", "rating"]).size().unstack(fill_value=0)
         over_time = over_time.rename(columns={"up": "Helpful", "down": "Not helpful"})
-        st.bar_chart(
-            over_time,
-            color=[SUCCESS if c == "Helpful" else MUTED for c in over_time.columns],
-            height=chart_height(len(over_time)),
-        )
+        grouped_bar(over_time, colors=[SUCCESS if c == "Helpful" else MUTED for c in over_time.columns])
 
 
 chart_row("Sessions per day", render_sessions_per_day, "Quality verdicts", render_quality_verdicts)
