@@ -40,6 +40,11 @@ from pipeline.pipeline import run_pipeline
 # rag_eval_20260722T195411Z.json): technical, pass_rate 0.452 / mean 0.891.
 WINNER_STYLE = "technical"
 STYLES = ["detailed", "concise", "technical"]
+STYLE_LABELS = {
+    "detailed": "Detailed",
+    "concise": "Concise",
+    "technical": "Technical (recommended)",
+}
 FEEDBACK_FILE = Path("logs/feedback.jsonl")
 
 
@@ -164,7 +169,9 @@ with st.sidebar:
         STYLES,
         index=STYLES.index(WINNER_STYLE),
         horizontal=True,
-        format_func=lambda s: s.capitalize(),
+        format_func=lambda s: STYLE_LABELS.get(s, s.capitalize()),
+        help="Technical is recommended because it had the best evaluation "
+             "score. Detailed gives more context; Concise keeps the answer shorter.",
     )
 
     llm_provider = get_provider()
