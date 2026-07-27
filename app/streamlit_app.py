@@ -155,8 +155,9 @@ def _write_feedback(session_id: str, rating: str, comment: str = "") -> None:
 # ------------------------------------------------------------------
 with st.sidebar:
     ui.brand(
-        ["HomeBarista", "Coach"],
+        ["HomeBarista  Coach ☕"],
         "Science-backed coffee coaching from YouTube barista expertise.",
+        mark="",
     )
 
     # NOTE: both controls stay st.radio, in this order (style, then mode).

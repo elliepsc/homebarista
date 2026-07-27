@@ -286,9 +286,14 @@ def brand(name_lines: list[str], tagline: str = "", mark: str = "☕") -> None:
     """Sidebar identity — one compact block instead of a title + caption stack."""
     label = "<br>".join(_e(line) for line in name_lines)
     tag = f'<p class="hb-brand__tag">{_e(tagline)}</p>' if tagline else ""
+    mark_html = (
+        f'<span class="hb-brand__mark">{_e(mark)}</span>'
+        if mark
+        else ""
+    )
     st.html(
         '<div class="hb-brand">'
-        f'<span class="hb-brand__mark">{_e(mark)}</span>'
+        f"{mark_html}"
         f'<span class="hb-brand__name">{label}</span>'
         "</div>"
         f"{tag}"
