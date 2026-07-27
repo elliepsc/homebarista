@@ -1,13 +1,12 @@
 """
-Monitoring dashboard — reads logs/sessions.jsonl + logs/feedback.jsonl.
+Monitoring dashboard: reads logs/sessions.jsonl + logs/feedback.jsonl.
 Falls back to the committed *.sample.jsonl files so the dashboard is never
-empty on a fresh clone. 7 charts + 4 headline metrics.
+empty on a fresh clone.
 
-Presentation notes (no data is created or transformed here beyond display):
-- headline numbers are compact metric cards, not st.metric tiles;
-- chart height scales with the number of points, so 2 sessions don't get the
-  same canvas as 200;
-- chart colors come from the espresso palette in .streamlit/config.toml.
+Presentation notes:
+- headline numbers are rendered as a compact table for screenshots;
+- recent sessions stay as the detailed table;
+- charts are rendered row by row, two per line, for visual consistency.
 """
 
 import json
@@ -18,7 +17,7 @@ import streamlit as st
 
 from app import ui
 
-st.set_page_config(page_title="HomeBarista — Monitoring", page_icon="☕", layout="wide")
+st.set_page_config(page_title="HomeBarista - Monitoring", page_icon="☕", layout="wide")
 ui.inject_css()
 
 ACCENT = "#6F4E37"
@@ -35,13 +34,23 @@ def load_jsonl(path: str) -> pd.DataFrame:
 
 
 def chart_height(n_points: int) -> int:
-    """Small datasets get a small canvas — a near-empty chart should not own
-    a third of the screen."""
-    return int(min(300, max(150, 60 + 30 * max(n_points, 1))))
+    """Keep all chart panels visually comparable while avoiding empty canvases."""
+    return int(min(260, max(180, 70 + 28 * max(n_points, 1))))
 
 
 def bar(data, color=ACCENT) -> None:
     st.bar_chart(data, color=color, height=chart_height(len(data)))
+
+
+def chart_row(left_title: str, left_render, right_title: str, right_render) -> None:
+    """Render charts as explicit rows: two panels, then a new row."""
+    left, right = st.columns(2, gap="large")
+    with left:
+        ui.section_label(left_title)
+        left_render()
+    with right:
+        ui.section_label(right_title)
+        right_render()
 
 
 ui.page_header("HomeBarista Coach", "Monitoring", "Session quality, coverage and user feedback.")
@@ -76,25 +85,26 @@ else:
     n_pass, pass_rate = 0, 0.0
 oos_rate = (sessions["status"] == "out_of_scope").mean()
 
-cards = [
-    {"label": "Sessions", "value": f"{n_sessions}"},
-    {"label": "Quality pass", "value": f"{pass_rate:.0%}", "sub": f"{n_pass} of {n_sessions}"},
-    {"label": "Out of scope", "value": f"{oos_rate:.0%}", "sub": "refused at zero token cost"},
+summary_rows = [
+    {"Metric": "Sessions", "Value": f"{n_sessions}", "Detail": "Logged sessions"},
+    {"Metric": "Quality pass", "Value": f"{pass_rate:.0%}", "Detail": f"{n_pass} of {n_sessions} passed"},
+    {"Metric": "Out of scope", "Value": f"{oos_rate:.0%}", "Detail": "Refused at zero token cost"},
 ]
 if not feedback.empty:
     satisfaction = (feedback["rating"] == "up").mean()
-    cards.append({
-        "label": "Satisfaction",
-        "value": f"{satisfaction:.0%}",
-        "sub": f"{len(feedback)} rating{'s' if len(feedback) != 1 else ''}",
+    summary_rows.append({
+        "Metric": "Satisfaction",
+        "Value": f"{satisfaction:.0%}",
+        "Detail": f"{len(feedback)} rating{'s' if len(feedback) != 1 else ''}",
     })
 else:
-    cards.append({"label": "Satisfaction", "value": "—", "sub": "no ratings yet"})
+    summary_rows.append({"Metric": "Satisfaction", "Value": "-", "Detail": "No ratings yet"})
 
-ui.metric_cards(cards)
+ui.section_label("Summary")
+st.dataframe(pd.DataFrame(summary_rows), hide_index=True, use_container_width=True)
 
 # ------------------------------------------------------------------
-# Recent sessions — display-only reshaping of columns already logged
+# Recent sessions
 # ------------------------------------------------------------------
 ui.section_label("Recent sessions")
 recent = sessions.sort_values("timestamp", ascending=False).head(8)
@@ -102,36 +112,22 @@ recent_view = pd.DataFrame({
     "When": pd.to_datetime(recent["timestamp"], format="ISO8601").dt.strftime("%d %b %H:%M"),
     "Problem": recent["raw_problem"].fillna("").str.slice(0, 70),
     "Machine": recent["machine_type"].map(lambda v: ui.humanize_label(v, "Unknown")),
-    "Status": recent["status"].map(lambda v: ui.humanize_label(v, "—")),
-    "Quality": recent["verdict"].map(lambda v: ui.VERDICT_LABELS.get(str(v).lower(), "—")),
+    "Status": recent["status"].map(lambda v: ui.humanize_label(v, "-")),
+    "Quality": recent["verdict"].map(lambda v: ui.VERDICT_LABELS.get(str(v).lower(), "-")),
 })
-st.dataframe(recent_view, hide_index=True)  # width defaults to "stretch"
+st.dataframe(recent_view, hide_index=True, use_container_width=True)
 
 # ------------------------------------------------------------------
 # Charts
 # ------------------------------------------------------------------
 ui.rule()
-left, right = st.columns(2, gap="large")
 
-with left:
-    ui.section_label("Sessions per day")
+
+def render_sessions_per_day() -> None:
     bar(sessions.groupby("date").size())
 
-    ui.section_label("Machines detected")
-    bar(sessions["machine_type"].fillna("unknown").map(ui.humanize_label).value_counts())
 
-    ui.section_label("Session status")
-    st.caption(
-        "Coaching · clarification needed · out of scope · error — out of scope "
-        "requests are refused by the ScopeGuard at zero token cost."
-    )
-    bar(sessions["status"].map(ui.humanize_label).value_counts())
-
-    ui.section_label("Agent iterations per session")
-    bar(sessions["iterations"].value_counts().sort_index())
-
-with right:
-    ui.section_label("Quality verdicts")
+def render_quality_verdicts() -> None:
     verdicts = (
         sessions["verdict"].fillna("n/a")
         .map(lambda v: ui.VERDICT_LABELS.get(str(v).lower(), ui.humanize_label(v)))
@@ -139,22 +135,44 @@ with right:
     )
     bar(verdicts, color=SUCCESS)
 
-    ui.section_label("Top symptoms")
+
+def render_machines_detected() -> None:
+    bar(sessions["machine_type"].fillna("unknown").map(ui.humanize_label).value_counts())
+
+
+def render_top_symptoms() -> None:
     symptoms = sessions["symptoms"].explode().dropna()
     if symptoms.empty:
         st.caption("No symptoms logged yet.")
     else:
         bar(symptoms.map(ui.humanize_label).value_counts())
 
-    ui.section_label("User feedback")
+
+def render_session_status() -> None:
+    st.caption(
+        "Coaching, clarification needed, out of scope, error. "
+        "Out of scope requests are refused by the ScopeGuard at zero token cost."
+    )
+    bar(sessions["status"].map(ui.humanize_label).value_counts())
+
+
+def render_user_feedback() -> None:
     if feedback.empty:
-        st.caption("No feedback logged yet — rate a coaching in the main app.")
+        st.caption("No feedback logged yet - rate a coaching in the main app.")
     else:
         ratings = feedback["rating"].map({"up": "Helpful", "down": "Not helpful"}).value_counts()
         bar(ratings, color=SUCCESS)
 
+
+def render_agent_iterations() -> None:
+    bar(sessions["iterations"].value_counts().sort_index())
+
+
+def render_feedback_over_time() -> None:
+    if feedback.empty:
+        st.caption("No feedback logged yet.")
+    else:
         feedback["date"] = pd.to_datetime(feedback["timestamp"], format="ISO8601").dt.date
-        st.caption("Feedback over time")
         over_time = feedback.groupby(["date", "rating"]).size().unstack(fill_value=0)
         over_time = over_time.rename(columns={"up": "Helpful", "down": "Not helpful"})
         st.bar_chart(
@@ -162,3 +180,9 @@ with right:
             color=[SUCCESS if c == "Helpful" else MUTED for c in over_time.columns],
             height=chart_height(len(over_time)),
         )
+
+
+chart_row("Sessions per day", render_sessions_per_day, "Quality verdicts", render_quality_verdicts)
+chart_row("Machines detected", render_machines_detected, "Top symptoms", render_top_symptoms)
+chart_row("Session status", render_session_status, "User feedback", render_user_feedback)
+chart_row("Agent iterations per session", render_agent_iterations, "Feedback over time", render_feedback_over_time)
