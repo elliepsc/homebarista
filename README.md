@@ -4,6 +4,8 @@
 
 **AI barista coaching that diagnoses your bad coffee — built on RAG over YouTube barista expertise, with a deterministic diagnostic engine and an agentic tool-use loop.**
 
+> 📋 **Reviewing this project?** [`PEER_REVIEW.md`](PEER_REVIEW.md) maps every Zoomcamp criterion to where it lives and how to verify it in ~30 seconds.
+
 ## 1. Problem description
 
 Diagnosing bad coffee at home is an expertise-dispersion problem. The knowledge needed to fix a bitter espresso or a weak V60 exists — but it is scattered across hundreds of hours of YouTube videos from expert baristas (James Hoffmann, Lance Hedrick, and others). A home user with a DeLonghi super-automatic who gets sour shots doesn't know *which* video answers *their* problem, and generic LLM answers ignore the constraints of their machine (you can't adjust tamping pressure on a super-automatic).
