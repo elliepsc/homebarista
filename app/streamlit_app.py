@@ -47,6 +47,14 @@ STYLE_LABELS = {
 }
 FEEDBACK_FILE = Path("logs/feedback.jsonl")
 
+# Where a visitor goes to create their own key, per provider. Shown under the
+# BYO-key input so "paste YOUR key" is actionable for someone who has none.
+KEY_SIGNUP_URLS = {
+    "groq": "https://console.groq.com/keys",
+    "anthropic": "https://console.anthropic.com/settings/keys",
+    "openai": "https://platform.openai.com/api-keys",
+}
+
 
 def _build_marker() -> str:
     """Short git SHA of the running checkout, read straight from .git (no git
@@ -210,6 +218,11 @@ with st.sidebar:
                     help="Kept in your session only — never stored, never "
                          "logged, never shared with other sessions.",
                 )
+                signup_url = KEY_SIGNUP_URLS.get(llm_provider)
+                if signup_url:
+                    st.caption(
+                        f"No key yet? [Get a free {llm_provider} API key]({signup_url})"
+                    )
                 if byo:
                     st.session_state["byo_api_key"] = byo.strip()
                     st.session_state["live_unlocked"] = True
@@ -259,8 +272,8 @@ with st.sidebar:
 ui.banner()
 ui.page_header(
     "Home Barista Coach",
-    "What's wrong with your coffee?",
-    "Tell me what you taste, what machine you use, or what you'd like to improve.",
+    "Enjoy better coffee at home.",
+    "Tell me what your coffee tastes like, what machine you use, or what you'd like to improve.",
 )
 
 _messages = st.session_state["messages"]
