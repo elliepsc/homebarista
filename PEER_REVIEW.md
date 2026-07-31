@@ -20,7 +20,8 @@ diagnosis + mock coaching. Demo mode is intentionally ML-free so it never OOMs.
 
 **To see the real RAG (retrieval + LLM), pick either:**
 - In the sidebar, switch **Mode → Live**, then **paste your own free Groq key**
-  (grab one in 30 s at https://console.groq.com/keys — session-only, never stored), **or**
+  (the field itself links to https://console.groq.com/keys — 30 s to create one;
+  the key stays session-only, never stored), **or**
 - use the **shared password** provided in my Zoomcamp submission notes (kept out
   of this public repo on purpose, to protect the shared free-tier quota).
 
